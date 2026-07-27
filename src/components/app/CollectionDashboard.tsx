@@ -74,12 +74,11 @@ export function CollectionDashboard() {
             filed.
           </p>
         </div>
-        <Link
-          href="/app/cards/new"
-          className="cf-btn cf-btn-primary hidden w-full sm:inline-flex sm:w-auto"
-        >
-          Add card
-        </Link>
+        <div className="hidden md:block">
+          <Link href="/app/cards/new" className="cf-btn cf-btn-primary">
+            Add card
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

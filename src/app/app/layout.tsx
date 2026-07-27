@@ -53,12 +53,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="hidden border border-ink/30 bg-cream px-2 py-1 font-mono text-[0.65rem] tracking-[0.12em] text-sage uppercase lg:inline">
                 Ref · CF-DESK
               </span>
-              <Link
-                href="/app/cards/new"
-                className="cf-btn cf-btn-primary hidden shadow-[3px_3px_0_rgba(34,40,58,0.15)] md:inline-flex"
-              >
-                Add card
-              </Link>
+              <div className="hidden md:block">
+                <Link
+                  href="/app/cards/new"
+                  className="cf-btn cf-btn-primary shadow-[3px_3px_0_rgba(34,40,58,0.15)]"
+                >
+                  Add card
+                </Link>
+              </div>
               <AppMobileMenu />
             </div>
           </div>
