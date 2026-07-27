@@ -1,0 +1,118 @@
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 1.5rem;
+  background: #faf5e9;
+  border: 1.5px solid #22283a;
+  box-shadow:
+    6px 6px 0 rgba(34, 40, 58, 0.12),
+    0 1px 0 rgba(216, 184, 124, 0.5) inset;
+  transform: rotate(2.5deg);
+}
+
+.tab {
+  position: absolute;
+  top: -12px;
+  right: 18px;
+  padding: 0.2rem 0.55rem;
+  background: #d8b87c;
+  border: 1.5px solid #22283a;
+  border-bottom: none;
+  font-family: var(--font-ibm-plex-mono), "Courier New", Courier, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: #22283a;
+  text-transform: uppercase;
+}
+
+.photo {
+  position: relative;
+  margin-bottom: 1.1rem;
+  border: 1.5px solid #22283a;
+  background: #2b2620;
+  aspect-ratio: 2.5 / 3.5;
+  max-height: 240px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(250, 245, 233, 0.35);
+}
+
+.photoImg {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.fields {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  border-bottom: 1px dotted #d8b87c;
+  padding-bottom: 0.35rem;
+}
+
+.row dt {
+  margin: 0;
+  font-family: var(--font-ibm-plex-mono), "Courier New", Courier, monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5f7a5c;
+}
+
+.row dd {
+  margin: 0;
+  font-family: var(--font-ibm-plex-sans), "Helvetica Neue", Arial, sans-serif;
+  font-size: 0.9rem;
+  color: #22283a;
+}
+
+.price {
+  font-family: var(--font-ibm-plex-mono), "Courier New", Courier, monospace !important;
+  font-weight: 500;
+  color: #ab3b2c !important;
+}
+
+.stamp {
+  position: absolute;
+  bottom: 1.1rem;
+  right: -0.4rem;
+  padding: 0.3rem 0.55rem;
+  border: 2px solid #ab3b2c;
+  border-radius: 2px;
+  color: #ab3b2c;
+  font-family: var(--font-special-elite), "Courier New", Courier, monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  transform: rotate(-12deg);
+  background: rgba(250, 245, 233, 0.85);
+  box-shadow: 1px 1px 0 rgba(171, 59, 44, 0.2);
+  opacity: 0.92;
+}
+
+@media (max-width: 759px) {
+  .card {
+    transform: rotate(0.8deg);
+    max-width: min(280px, 100%);
+    padding: 1.35rem 1.15rem 1.25rem;
+  }
+
+  .photo {
+    max-height: 210px;
+  }
+
+  .stamp {
+    bottom: 0.85rem;
+    right: -0.15rem;
+    font-size: 0.62rem;
+  }
+}
