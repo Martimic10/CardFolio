@@ -27,6 +27,7 @@ export function CardDetailView({ id }: { id: string }) {
     player: "",
     sport: "",
     year: "",
+    brand: "",
     setName: "",
     cardNumber: "",
     variant: "",
@@ -49,6 +50,7 @@ export function CardDetailView({ id }: { id: string }) {
       player: c.player,
       sport: c.sport,
       year: String(c.year),
+      brand: c.brand ?? "",
       setName: c.setName,
       cardNumber: c.cardNumber ?? "",
       variant: c.variant ?? "",
@@ -74,6 +76,7 @@ export function CardDetailView({ id }: { id: string }) {
         player: form.player,
         sport: form.sport,
         year: Number(form.year),
+        brand: form.brand || null,
         setName: form.setName,
         cardNumber: form.cardNumber || null,
         variant: form.variant || null,
@@ -114,7 +117,7 @@ export function CardDetailView({ id }: { id: string }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cards"] });
       await queryClient.invalidateQueries({ queryKey: ["summary"] });
-      router.push("/app");
+      router.push("/app/collection");
     },
   });
 
@@ -130,7 +133,7 @@ export function CardDetailView({ id }: { id: string }) {
     return (
       <div className="border-2 border-stamp bg-paper px-6 py-4 font-body text-sm text-stamp">
         Card not found.{" "}
-        <Link href="/app" className="underline">
+        <Link href="/app/collection" className="underline">
           Back to collection
         </Link>
       </div>
@@ -145,7 +148,7 @@ export function CardDetailView({ id }: { id: string }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
-            href="/app"
+            href="/app/collection"
             className="font-body text-sm text-charcoal no-underline hover:text-ink"
           >
             ← Collection
@@ -153,7 +156,8 @@ export function CardDetailView({ id }: { id: string }) {
           <p className="cf-label mt-4 mb-2">Catalog record</p>
           <h1 className="font-display text-2xl text-ink sm:text-3xl">{card.player}</h1>
           <p className="mt-2 font-body text-sm text-charcoal">
-            {card.year} · {card.setName}
+            {card.year}
+            {card.brand ? ` · ${card.brand}` : ""} · {card.setName}
             {card.cardNumber ? ` #${card.cardNumber}` : ""}
             {card.variant ? ` · ${card.variant}` : ""}
           </p>
@@ -212,6 +216,7 @@ export function CardDetailView({ id }: { id: string }) {
                     ["player", "Name"],
                     ["sport", "Category"],
                     ["year", "Year"],
+                    ["brand", "Brand"],
                     ["setName", "Set"],
                     ["cardNumber", "Card #"],
                     ["variant", "Variant"],
@@ -256,6 +261,7 @@ export function CardDetailView({ id }: { id: string }) {
                 {[
                   ["Category", card.sport],
                   ["Year", String(card.year)],
+                  ["Brand", card.brand || "—"],
                   ["Set", card.setName],
                   ["Card #", card.cardNumber || "—"],
                   ["Variant", card.variant || "—"],

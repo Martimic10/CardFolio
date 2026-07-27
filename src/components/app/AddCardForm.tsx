@@ -20,6 +20,7 @@ const emptyForm = {
   player: "",
   sport: "Pokémon",
   year: new Date().getFullYear().toString(),
+  brand: "",
   setName: "",
   cardNumber: "",
   variant: "",
@@ -42,12 +43,14 @@ function applyScanToForm(
     sport: string;
     year: string;
     setName: string;
+    brand: string;
   },
 ) {
   return {
     player: scan.player || "Untitled card",
     sport: scan.sport || fallbacks.sport,
     year: scan.year ? String(scan.year) : fallbacks.year,
+    brand: scan.brand || fallbacks.brand,
     setName: scan.setName || fallbacks.setName || scan.brand || "Unsorted",
     cardNumber: scan.cardNumber || "",
     variant: scan.variant || "",
@@ -108,6 +111,7 @@ export function AddCardForm() {
         player: form.player,
         sport: form.sport,
         year: Number(form.year),
+        brand: form.brand || null,
         setName: form.setName,
         cardNumber: form.cardNumber || null,
         variant: form.variant || null,
@@ -147,6 +151,7 @@ export function AddCardForm() {
         sport: form.sport,
         year: form.year,
         setName: form.setName,
+        brand: form.brand,
       });
       setForm((f) => ({
         ...f,
@@ -170,6 +175,7 @@ export function AddCardForm() {
         sport: form.sport,
         year: form.year || String(new Date().getFullYear()),
         setName: form.setName || "Unsorted",
+        brand: form.brand || "",
       };
 
       for (let i = 0; i < files.length; i++) {
@@ -182,6 +188,7 @@ export function AddCardForm() {
           player: fileLabel(file),
           sport: fallbacks.sport,
           year: Number(fallbacks.year) || new Date().getFullYear(),
+          brand: fallbacks.brand || null as string | null,
           setName: fallbacks.setName,
           cardNumber: null as string | null,
           variant: null as string | null,
@@ -196,6 +203,7 @@ export function AddCardForm() {
               player: filled.player,
               sport: filled.sport,
               year: Number(filled.year) || fields.year,
+              brand: filled.brand || null,
               setName: filled.setName,
               cardNumber: filled.cardNumber || null,
               variant: filled.variant || null,
@@ -210,6 +218,7 @@ export function AddCardForm() {
           player: fields.player,
           sport: fields.sport,
           year: fields.year,
+          brand: fields.brand,
           setName: fields.setName,
           cardNumber: fields.cardNumber,
           variant: fields.variant,
@@ -230,7 +239,7 @@ export function AddCardForm() {
       await queryClient.invalidateQueries({ queryKey: ["summary"] });
       setBulkProgress(null);
       setFiles([]);
-      router.push("/app");
+      router.push("/app/collection");
     },
     onError: (err: Error) => {
       setBulkProgress(null);
@@ -261,7 +270,7 @@ export function AddCardForm() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <Link
-          href="/app"
+          href="/app/collection"
           className="font-body text-sm text-charcoal no-underline hover:text-ink"
         >
           ← Collection
@@ -465,11 +474,20 @@ export function AddCardForm() {
                   className="cf-input font-mono"
                 />
               </Field>
-              <Field label="Set / brand" required>
+              <Field label="Brand">
+                <input
+                  value={form.brand}
+                  onChange={(e) => update("brand", e.target.value)}
+                  placeholder="Topps, Score, Panini…"
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Set name" required>
                 <input
                   required={mode === "single"}
                   value={form.setName}
                   onChange={(e) => update("setName", e.target.value)}
+                  placeholder="Chrome, Series 1, Base Set…"
                   className="cf-input"
                 />
               </Field>
@@ -537,7 +555,15 @@ export function AddCardForm() {
                   className="cf-input font-mono"
                 />
               </Field>
-              <Field label="Set / brand (optional)">
+              <Field label="Brand (optional)">
+                <input
+                  value={form.brand}
+                  onChange={(e) => update("brand", e.target.value)}
+                  placeholder="Topps, Score, Panini…"
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Set name (optional)">
                 <input
                   value={form.setName}
                   onChange={(e) => update("setName", e.target.value)}

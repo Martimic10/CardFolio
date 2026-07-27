@@ -298,7 +298,8 @@ function CardTable({
                 {card.player}
               </p>
               <p className="truncate font-body text-xs text-charcoal">
-                {card.year} · {card.setName}
+                {card.year}
+                {card.brand ? ` · ${card.brand}` : ""} · {card.setName}
                 {card.cardNumber ? ` #${card.cardNumber}` : ""}
               </p>
               <p className="mt-0.5 font-mono text-[0.65rem] uppercase tracking-wider text-sage">
@@ -364,6 +365,7 @@ function CardTable({
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-charcoal">
+                  {card.brand ? `${card.brand} · ` : ""}
                   {card.setName}
                   {card.cardNumber ? ` #${card.cardNumber}` : ""}
                 </td>
@@ -413,7 +415,8 @@ function CardGrid({ cards }: { cards: CardListItem[] }) {
           </div>
           <h3 className="font-display text-lg text-ink">{card.player}</h3>
           <p className="mt-1 font-body text-sm text-charcoal">
-            {card.year} · {card.setName}
+            {card.year}
+            {card.brand ? ` · ${card.brand}` : ""} · {card.setName}
           </p>
           <div className="mt-3 flex items-center justify-between border-t border-dotted border-manila pt-3 text-sm">
             <span className="font-mono text-sage">

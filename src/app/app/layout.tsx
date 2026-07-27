@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppMobileMenu } from "@/components/app/AppMobileMenu";
 import { Providers } from "@/components/app/Providers";
 
 export const metadata = {
@@ -10,7 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <Providers>
       <div className="marketing-surface">
         <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/95 shadow-[0_8px_24px_rgba(34,40,58,0.08)] backdrop-blur-md">
-          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 md:px-8">
+          <div className="relative mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 md:px-8">
             <div className="flex min-w-0 items-center gap-3 md:gap-8">
               <Link
                 href="/"
@@ -34,7 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
               <nav className="hidden items-stretch border-2 border-ink md:flex">
                 <Link
-                  href="/app"
+                  href="/app/collection"
                   className="border-r-2 border-ink bg-cream px-4 py-2 font-body text-sm text-ink no-underline hover:bg-manila/40"
                 >
                   Collection
@@ -54,10 +55,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </span>
               <Link
                 href="/app/cards/new"
-                className="cf-btn cf-btn-primary hidden shadow-[3px_3px_0_rgba(34,40,58,0.15)] sm:inline-flex"
+                className="cf-btn cf-btn-primary hidden shadow-[3px_3px_0_rgba(34,40,58,0.15)] md:inline-flex"
               >
                 Add card
               </Link>
+              <AppMobileMenu />
             </div>
           </div>
         </header>
@@ -65,11 +67,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="app-main mx-auto w-full max-w-5xl px-4 py-6 sm:px-5 sm:py-10 md:px-8 md:py-12">
           {children}
         </main>
-
-        <nav className="app-bottom-nav" aria-label="Mobile">
-          <Link href="/app">Collection</Link>
-          <Link href="/app/cards/new">Add card</Link>
-        </nav>
       </div>
     </Providers>
   );

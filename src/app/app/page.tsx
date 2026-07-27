@@ -1,5 +1,5 @@
-import { CollectionDashboard } from "@/components/app/CollectionDashboard";
+import { redirect } from "next/navigation";
 
 export default function AppHomePage() {
-  return <CollectionDashboard />;
+  redirect("/app/collection");
 }

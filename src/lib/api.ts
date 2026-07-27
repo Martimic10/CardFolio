@@ -134,6 +134,7 @@ export type CardDetail = {
   player: string;
   sport: string;
   year: number;
+  brand: string | null;
   setName: string;
   cardNumber: string | null;
   variant: string | null;

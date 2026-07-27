@@ -10,6 +10,7 @@ function mapCard(card: {
   player: string;
   sport: string;
   year: number;
+  brand: string | null;
   setName: string;
   cardNumber: string | null;
   variant: string | null;
@@ -26,6 +27,7 @@ function mapCard(card: {
     player: card.player,
     sport: card.sport,
     year: card.year,
+    brand: card.brand,
     setName: card.setName,
     cardNumber: card.cardNumber,
     variant: card.variant,
@@ -56,9 +58,10 @@ export async function GET(request: NextRequest) {
         ...(q
           ? {
               OR: [
-                { player: { contains: q } },
-                { setName: { contains: q } },
-                { cardNumber: { contains: q } },
+                { player: { contains: q, mode: "insensitive" } },
+                { setName: { contains: q, mode: "insensitive" } },
+                { brand: { contains: q, mode: "insensitive" } },
+                { cardNumber: { contains: q, mode: "insensitive" } },
               ],
             }
           : {}),
@@ -149,6 +152,7 @@ export async function POST(request: NextRequest) {
         player: data.player,
         sport: data.sport,
         year: data.year,
+        brand: data.brand || null,
         setName: data.setName,
         cardNumber: data.cardNumber || null,
         variant: data.variant || null,

@@ -23,6 +23,7 @@ model Card {
   player     String
   sport      String
   year       Int
+  brand      String?
   setName    String
   cardNumber String?
   variant    String?
@@ -39,6 +40,7 @@ model Card {
   @@index([userId])
   @@index([player])
   @@index([sport])
+  @@index([brand])
 }
 
 model CardImage {

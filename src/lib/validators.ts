@@ -4,6 +4,7 @@ export const createCardSchema = z.object({
   player: z.string().min(1),
   sport: z.string().min(1),
   year: z.coerce.number().int().min(1869).max(2100),
+  brand: z.string().optional().nullable(),
   setName: z.string().min(1),
   cardNumber: z.string().optional().nullable(),
   variant: z.string().optional().nullable(),
@@ -43,6 +44,7 @@ export type CardListItem = {
   player: string;
   sport: string;
   year: number;
+  brand: string | null;
   setName: string;
   cardNumber: string | null;
   variant: string | null;

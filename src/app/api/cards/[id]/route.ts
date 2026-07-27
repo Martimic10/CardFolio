@@ -55,6 +55,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         ...(data.player != null ? { player: data.player } : {}),
         ...(data.sport != null ? { sport: data.sport } : {}),
         ...(data.year != null ? { year: data.year } : {}),
+        ...(data.brand !== undefined ? { brand: data.brand || null } : {}),
         ...(data.setName != null ? { setName: data.setName } : {}),
         ...(data.cardNumber !== undefined
           ? { cardNumber: data.cardNumber || null }
