@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createCard, uploadFiles } from "@/lib/api";
 import { CARD_CATEGORIES } from "@/lib/categories";
 import { calculateGrade } from "@/lib/condition";
+
+type Mode = "single" | "bulk";
 
 const emptyForm = {
   player: "",
@@ -23,13 +25,31 @@ const emptyForm = {
   surface: "8",
 };
 
+function fileLabel(file: File) {
+  const base = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+  return base || "Untitled card";
+}
+
 export function AddCardForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const [mode, setMode] = useState<Mode>("single");
   const [form, setForm] = useState(emptyForm);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+
+  const previews = useMemo(
+    () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
+    [files],
+  );
+
+  useEffect(() => {
+    return () => {
+      previews.forEach((p) => URL.revokeObjectURL(p.url));
+    };
+  }, [previews]);
 
   const grade = calculateGrade({
     centering: Number(form.centering),
@@ -38,7 +58,14 @@ export function AddCardForm() {
     surface: Number(form.surface),
   });
 
-  const mutation = useMutation({
+  const conditionPayload = {
+    centering: Number(form.centering),
+    corners: Number(form.corners),
+    edges: Number(form.edges),
+    surface: Number(form.surface),
+  };
+
+  const singleMutation = useMutation({
     mutationFn: async (stayOpen: boolean) => {
       setError(null);
       let imageUrls: string[] = [];
@@ -56,12 +83,7 @@ export function AddCardForm() {
         quantity: Number(form.quantity) || 1,
         startingPrice: form.startingPrice ? Number(form.startingPrice) : null,
         imageUrls,
-        condition: {
-          centering: Number(form.centering),
-          corners: Number(form.corners),
-          edges: Number(form.edges),
-          surface: Number(form.surface),
-        },
+        condition: conditionPayload,
       });
       return { result, stayOpen };
     },
@@ -78,13 +100,65 @@ export function AddCardForm() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const bulkMutation = useMutation({
+    mutationFn: async () => {
+      if (!files.length) {
+        throw new Error("Select at least one photo.");
+      }
+      setError(null);
+      const createdIds: string[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setBulkProgress(`Uploading ${i + 1} of ${files.length}…`);
+        const uploaded = await uploadFiles([file]);
+        setBulkProgress(`Saving card ${i + 1} of ${files.length}…`);
+        const result = await createCard({
+          player: fileLabel(file),
+          sport: form.sport,
+          year: Number(form.year) || new Date().getFullYear(),
+          setName: form.setName || "Unsorted",
+          cardNumber: null,
+          variant: null,
+          quantity: 1,
+          startingPrice: form.startingPrice
+            ? Number(form.startingPrice)
+            : null,
+          imageUrls: uploaded.urls,
+          condition: conditionPayload,
+        });
+        createdIds.push(result.card.id);
+      }
+
+      return createdIds;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["cards"] });
+      await queryClient.invalidateQueries({ queryKey: ["summary"] });
+      setBulkProgress(null);
+      setFiles([]);
+      router.push("/app");
+    },
+    onError: (err: Error) => {
+      setBulkProgress(null);
+      setError(err.message);
+    },
+  });
+
+  const pending = singleMutation.isPending || bulkMutation.isPending;
+
   function update<K extends keyof typeof emptyForm>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
   function onFiles(list: FileList | null) {
     if (!list) return;
-    setFiles((prev) => [...prev, ...Array.from(list)]);
+    const next = Array.from(list).filter((f) => f.type.startsWith("image/"));
+    setFiles((prev) => [...prev, ...next]);
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   return (
@@ -97,22 +171,55 @@ export function AddCardForm() {
           ← Collection
         </Link>
         <p className="cf-label mt-4 mb-2">New record</p>
-        <h1 className="font-display text-2xl text-ink sm:text-3xl">Add card</h1>
+        <h1 className="font-display text-2xl text-ink sm:text-3xl">Add cards</h1>
         <p className="mt-2 font-body text-sm text-charcoal">
-          Sports or TCG — upload photos and enter details. Use Save & add
-          another when logging a stack.
+          Add one card with full details, or bulk-import a stack — one card per
+          photo.
         </p>
+      </div>
+
+      <div className="flex border-2 border-ink">
+        <button
+          type="button"
+          onClick={() => setMode("single")}
+          className={`min-h-11 flex-1 px-3 py-2 font-body text-sm ${
+            mode === "single" ? "bg-ink text-paper" : "bg-paper text-charcoal"
+          }`}
+        >
+          Single card
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("bulk")}
+          className={`min-h-11 flex-1 border-l-2 border-ink px-3 py-2 font-body text-sm ${
+            mode === "bulk" ? "bg-ink text-paper" : "bg-paper text-charcoal"
+          }`}
+        >
+          Bulk import
+        </button>
       </div>
 
       <form
         className="space-y-4 sm:space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
-          mutation.mutate(false);
+          if (mode === "bulk") {
+            bulkMutation.mutate();
+          } else {
+            singleMutation.mutate(false);
+          }
         }}
       >
         <section className="cf-panel p-4 sm:p-5">
-          <h2 className="font-display text-lg text-ink">Photos</h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-display text-lg text-ink">Photos</h2>
+            {files.length > 0 && (
+              <span className="font-mono text-xs text-sage">
+                {files.length} selected
+              </span>
+            )}
+          </div>
+
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -124,115 +231,208 @@ export function AddCardForm() {
               setDragOver(false);
               onFiles(e.dataTransfer.files);
             }}
-            className={`mt-3 border border-dashed px-4 py-8 text-center sm:py-10 ${
-              dragOver
-                ? "border-stamp bg-stamp/5"
-                : "border-manila bg-cream"
+            className={`border border-dashed px-4 py-6 text-center sm:py-8 ${
+              dragOver ? "border-stamp bg-stamp/5" : "border-manila bg-cream"
             }`}
           >
-            <p className="font-body text-sm text-charcoal">
-              Take or choose photos —{" "}
-              <label className="cursor-pointer font-medium text-stamp underline">
-                browse library
+            <p className="mb-4 font-body text-sm text-charcoal">
+              {mode === "bulk"
+                ? "Pick as many card photos as you want from your library."
+                : "Add front/back photos from your library, or take a new one."}
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <label className="cf-btn cf-btn-primary cursor-pointer">
+                Choose from library
                 <input
                   type="file"
                   accept="image/*"
                   multiple
-                  capture="environment"
                   className="sr-only"
-                  onChange={(e) => onFiles(e.target.files)}
+                  onChange={(e) => {
+                    onFiles(e.target.files);
+                    e.target.value = "";
+                  }}
                 />
               </label>
+              <label className="cf-btn cursor-pointer">
+                Take photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  onChange={(e) => {
+                    onFiles(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          {previews.length > 0 && (
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {previews.map((item, index) => (
+                <div
+                  key={`${item.file.name}-${item.file.size}-${index}`}
+                  className="relative overflow-hidden border border-ink/25 bg-cream"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.url}
+                    alt=""
+                    className="aspect-square w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFile(index)}
+                    className="absolute right-1 top-1 border border-ink bg-paper px-1.5 py-0.5 font-mono text-[0.65rem] text-ink"
+                    aria-label={`Remove ${item.file.name}`}
+                  >
+                    ×
+                  </button>
+                  {mode === "bulk" && (
+                    <p className="truncate border-t border-ink/15 px-1 py-1 font-mono text-[0.55rem] text-charcoal">
+                      {fileLabel(item.file)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {mode === "single" ? (
+          <>
+            <section className="cf-panel p-4 sm:p-5">
+              <h2 className="mb-4 font-display text-lg text-ink">Details</h2>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Name / player" required>
+                  <input
+                    required={mode === "single"}
+                    value={form.player}
+                    onChange={(e) => update("player", e.target.value)}
+                    placeholder="Player or character name"
+                    className="cf-input"
+                  />
+                </Field>
+                <Field label="Category">
+                  <select
+                    value={form.sport}
+                    onChange={(e) => update("sport", e.target.value)}
+                    className="cf-input"
+                  >
+                    {CARD_CATEGORIES.map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Year" required>
+                  <input
+                    required={mode === "single"}
+                    type="number"
+                    value={form.year}
+                    onChange={(e) => update("year", e.target.value)}
+                    className="cf-input font-mono"
+                  />
+                </Field>
+                <Field label="Set name" required>
+                  <input
+                    required={mode === "single"}
+                    value={form.setName}
+                    onChange={(e) => update("setName", e.target.value)}
+                    className="cf-input"
+                  />
+                </Field>
+                <Field label="Card number">
+                  <input
+                    value={form.cardNumber}
+                    onChange={(e) => update("cardNumber", e.target.value)}
+                    className="cf-input font-mono"
+                  />
+                </Field>
+                <Field label="Variant">
+                  <input
+                    value={form.variant}
+                    onChange={(e) => update("variant", e.target.value)}
+                    className="cf-input"
+                  />
+                </Field>
+                <Field label="Quantity">
+                  <input
+                    type="number"
+                    min={1}
+                    value={form.quantity}
+                    onChange={(e) => update("quantity", e.target.value)}
+                    className="cf-input font-mono"
+                  />
+                </Field>
+                <Field label="Starting price (optional)">
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.startingPrice}
+                    onChange={(e) => update("startingPrice", e.target.value)}
+                    className="cf-input font-mono"
+                  />
+                </Field>
+              </div>
+            </section>
+          </>
+        ) : (
+          <section className="cf-panel p-4 sm:p-5">
+            <h2 className="mb-2 font-display text-lg text-ink">
+              Shared defaults
+            </h2>
+            <p className="mb-4 font-body text-sm text-charcoal">
+              Applied to every card. Names start from each photo filename — edit
+              them later in the catalog.
             </p>
-            {files.length > 0 && (
-              <ul className="mt-4 space-y-1 text-left font-mono text-xs text-ink">
-                {files.map((f) => (
-                  <li key={f.name + f.size} className="truncate">
-                    {f.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Category">
+                <select
+                  value={form.sport}
+                  onChange={(e) => update("sport", e.target.value)}
+                  className="cf-input"
+                >
+                  {CARD_CATEGORIES.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Year">
+                <input
+                  type="number"
+                  value={form.year}
+                  onChange={(e) => update("year", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+              <Field label="Set name (optional)">
+                <input
+                  value={form.setName}
+                  onChange={(e) => update("setName", e.target.value)}
+                  placeholder="Defaults to Unsorted"
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Starting price (optional)">
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.startingPrice}
+                  onChange={(e) => update("startingPrice", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+            </div>
+          </section>
+        )}
 
-        <section className="cf-panel p-5">
-          <h2 className="mb-4 font-display text-lg text-ink">Details</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Name / player" required>
-              <input
-                required
-                value={form.player}
-                onChange={(e) => update("player", e.target.value)}
-                placeholder="Player or character name"
-                className="cf-input"
-              />
-            </Field>
-            <Field label="Category">
-              <select
-                value={form.sport}
-                onChange={(e) => update("sport", e.target.value)}
-                className="cf-input"
-              >
-                {CARD_CATEGORIES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Year" required>
-              <input
-                required
-                type="number"
-                value={form.year}
-                onChange={(e) => update("year", e.target.value)}
-                className="cf-input font-mono"
-              />
-            </Field>
-            <Field label="Set name" required>
-              <input
-                required
-                value={form.setName}
-                onChange={(e) => update("setName", e.target.value)}
-                className="cf-input"
-              />
-            </Field>
-            <Field label="Card number">
-              <input
-                value={form.cardNumber}
-                onChange={(e) => update("cardNumber", e.target.value)}
-                className="cf-input font-mono"
-              />
-            </Field>
-            <Field label="Variant">
-              <input
-                value={form.variant}
-                onChange={(e) => update("variant", e.target.value)}
-                className="cf-input"
-              />
-            </Field>
-            <Field label="Quantity">
-              <input
-                type="number"
-                min={1}
-                value={form.quantity}
-                onChange={(e) => update("quantity", e.target.value)}
-                className="cf-input font-mono"
-              />
-            </Field>
-            <Field label="Starting price (optional)">
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.startingPrice}
-                onChange={(e) => update("startingPrice", e.target.value)}
-                className="cf-input font-mono"
-              />
-            </Field>
-          </div>
-        </section>
-
-        <section className="cf-panel p-5">
+        <section className="cf-panel p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-display text-lg text-ink">Condition estimate</h2>
             <p className="font-mono text-sm text-stamp">
@@ -267,28 +467,48 @@ export function AddCardForm() {
           </div>
         </section>
 
-        {error && (
-          <p className="border-2 border-stamp bg-paper px-3 py-2 font-body text-sm text-stamp">
-            {error}
+        {(error || bulkProgress) && (
+          <p
+            className={`border-2 px-3 py-2 font-body text-sm ${
+              error
+                ? "border-stamp bg-paper text-stamp"
+                : "border-sage bg-paper text-sage"
+            }`}
+          >
+            {error || bulkProgress}
           </p>
         )}
 
         <div className="flex flex-col gap-3 pb-4 sm:flex-row sm:flex-wrap">
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="cf-btn cf-btn-primary w-full sm:w-auto"
-          >
-            {mutation.isPending ? "Saving…" : "Save card"}
-          </button>
-          <button
-            type="button"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate(true)}
-            className="cf-btn w-full sm:w-auto"
-          >
-            Save & add another
-          </button>
+          {mode === "single" ? (
+            <>
+              <button
+                type="submit"
+                disabled={pending}
+                className="cf-btn cf-btn-primary w-full sm:w-auto"
+              >
+                {pending ? "Saving…" : "Save card"}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => singleMutation.mutate(true)}
+                className="cf-btn w-full sm:w-auto"
+              >
+                Save & add another
+              </button>
+            </>
+          ) : (
+            <button
+              type="submit"
+              disabled={pending || files.length === 0}
+              className="cf-btn cf-btn-primary w-full sm:w-auto"
+            >
+              {pending
+                ? bulkProgress || "Importing…"
+                : `Import ${files.length || ""} card${files.length === 1 ? "" : "s"}`}
+            </button>
+          )}
         </div>
       </form>
     </div>

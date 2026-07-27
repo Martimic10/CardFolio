@@ -13,7 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4 md:px-8">
             <div className="flex min-w-0 items-center gap-3 md:gap-8">
               <Link
-                href="/app"
+                href="/"
                 className="group flex min-w-0 items-center gap-2.5 no-underline sm:gap-3"
               >
                 <span
@@ -41,15 +41,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link
                   href="/app/cards/new"
-                  className="border-r-2 border-ink bg-paper px-4 py-2 font-body text-sm text-charcoal no-underline hover:bg-cream"
-                >
-                  Intake
-                </Link>
-                <Link
-                  href="/"
                   className="bg-paper px-4 py-2 font-body text-sm text-charcoal no-underline hover:bg-cream"
                 >
-                  Site
+                  Intake
                 </Link>
               </nav>
             </div>
@@ -75,7 +69,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="app-bottom-nav" aria-label="Mobile">
           <Link href="/app">Collection</Link>
           <Link href="/app/cards/new">Add card</Link>
-          <Link href="/">Site</Link>
         </nav>
       </div>
     </Providers>

@@ -145,7 +145,7 @@ body {
   right: 0;
   z-index: 40;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   border-top: 2px solid var(--color-ink);
   background: rgba(250, 245, 233, 0.97);
   backdrop-filter: blur(8px);
@@ -175,9 +175,8 @@ body {
   touch-action: manipulation;
 }
 
-.app-bottom-nav a:nth-child(2) {
+.app-bottom-nav a:last-child {
   border-left: 1px solid rgba(34, 40, 58, 0.15);
-  border-right: 1px solid rgba(34, 40, 58, 0.15);
   background: var(--color-ink);
   color: var(--color-paper);
 }
