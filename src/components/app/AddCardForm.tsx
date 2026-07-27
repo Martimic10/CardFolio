@@ -3,8 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createCard, uploadFiles } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  createCard,
+  fetchScanStatus,
+  scanCardImage,
+  uploadFiles,
+  type ScannedCard,
+} from "@/lib/api";
 import { CARD_CATEGORIES } from "@/lib/categories";
 import { calculateGrade } from "@/lib/condition";
 
@@ -30,6 +36,24 @@ function fileLabel(file: File) {
   return base || "Untitled card";
 }
 
+function applyScanToForm(
+  scan: ScannedCard,
+  fallbacks: {
+    sport: string;
+    year: string;
+    setName: string;
+  },
+) {
+  return {
+    player: scan.player || "Untitled card",
+    sport: scan.sport || fallbacks.sport,
+    year: scan.year ? String(scan.year) : fallbacks.year,
+    setName: scan.setName || fallbacks.setName || scan.brand || "Unsorted",
+    cardNumber: scan.cardNumber || "",
+    variant: scan.variant || "",
+  };
+}
+
 export function AddCardForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -39,6 +63,13 @@ export function AddCardForm() {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+
+  const scanStatus = useQuery({
+    queryKey: ["scan-status"],
+    queryFn: fetchScanStatus,
+  });
+  const scanEnabled = scanStatus.data?.configured ?? false;
 
   const previews = useMemo(
     () => files.map((file) => ({ file, url: URL.createObjectURL(file) })),
@@ -93,9 +124,37 @@ export function AddCardForm() {
       if (stayOpen) {
         setForm(emptyForm);
         setFiles([]);
+        setScanNote(null);
       } else {
         router.push(`/app/cards/${result.card.id}`);
       }
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const scanFirstPhotoMutation = useMutation({
+    mutationFn: async () => {
+      if (!files[0]) throw new Error("Add a photo first.");
+      setScanNote(null);
+      const uploaded = await uploadFiles([files[0]]);
+      const imageUrl = uploaded.urls[0];
+      if (!imageUrl) throw new Error("Upload failed.");
+      const scan = await scanCardImage(imageUrl);
+      return { scan, imageUrl, allUrls: uploaded.urls };
+    },
+    onSuccess: ({ scan }) => {
+      const filled = applyScanToForm(scan, {
+        sport: form.sport,
+        year: form.year,
+        setName: form.setName,
+      });
+      setForm((f) => ({
+        ...f,
+        ...filled,
+      }));
+      setScanNote(
+        `Scanned · ${Math.round(scan.confidence * 100)}% confidence. Review fields before saving.`,
+      );
     },
     onError: (err: Error) => setError(err.message),
   });
@@ -107,19 +166,53 @@ export function AddCardForm() {
       }
       setError(null);
       const createdIds: string[] = [];
+      const fallbacks = {
+        sport: form.sport,
+        year: form.year || String(new Date().getFullYear()),
+        setName: form.setName || "Unsorted",
+      };
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setBulkProgress(`Uploading ${i + 1} of ${files.length}…`);
         const uploaded = await uploadFiles([file]);
+        const imageUrl = uploaded.urls[0];
+
+        let fields = {
+          player: fileLabel(file),
+          sport: fallbacks.sport,
+          year: Number(fallbacks.year) || new Date().getFullYear(),
+          setName: fallbacks.setName,
+          cardNumber: null as string | null,
+          variant: null as string | null,
+        };
+
+        if (scanEnabled && imageUrl) {
+          try {
+            setBulkProgress(`Scanning ${i + 1} of ${files.length}…`);
+            const scan = await scanCardImage(imageUrl);
+            const filled = applyScanToForm(scan, fallbacks);
+            fields = {
+              player: filled.player,
+              sport: filled.sport,
+              year: Number(filled.year) || fields.year,
+              setName: filled.setName,
+              cardNumber: filled.cardNumber || null,
+              variant: filled.variant || null,
+            };
+          } catch (err) {
+            console.warn("Scan failed, using fallbacks", err);
+          }
+        }
+
         setBulkProgress(`Saving card ${i + 1} of ${files.length}…`);
         const result = await createCard({
-          player: fileLabel(file),
-          sport: form.sport,
-          year: Number(form.year) || new Date().getFullYear(),
-          setName: form.setName || "Unsorted",
-          cardNumber: null,
-          variant: null,
+          player: fields.player,
+          sport: fields.sport,
+          year: fields.year,
+          setName: fields.setName,
+          cardNumber: fields.cardNumber,
+          variant: fields.variant,
           quantity: 1,
           startingPrice: form.startingPrice
             ? Number(form.startingPrice)
@@ -145,7 +238,10 @@ export function AddCardForm() {
     },
   });
 
-  const pending = singleMutation.isPending || bulkMutation.isPending;
+  const pending =
+    singleMutation.isPending ||
+    bulkMutation.isPending ||
+    scanFirstPhotoMutation.isPending;
 
   function update<K extends keyof typeof emptyForm>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -173,9 +269,24 @@ export function AddCardForm() {
         <p className="cf-label mt-4 mb-2">New record</p>
         <h1 className="font-display text-2xl text-ink sm:text-3xl">Add cards</h1>
         <p className="mt-2 font-body text-sm text-charcoal">
-          Add one card with full details, or bulk-import a stack — one card per
-          photo.
+          Add one card with full details, or bulk-import a stack. When scanning
+          is on, each photo is auto-read for name, category, year, set, and
+          number.
         </p>
+      </div>
+
+      <div
+        className={`border-2 px-3 py-2 font-body text-sm ${
+          scanEnabled
+            ? "border-sage bg-paper text-sage"
+            : "border-manila bg-paper text-charcoal"
+        }`}
+      >
+        {scanStatus.isLoading
+          ? "Checking scan status…"
+          : scanEnabled
+            ? "Auto-scan is on — bulk import will identify each card from its photo."
+            : "Auto-scan is off. Add OPENAI_API_KEY to .env (and Vercel) to enable."}
       </div>
 
       <div className="flex border-2 border-ink">
@@ -237,8 +348,8 @@ export function AddCardForm() {
           >
             <p className="mb-4 font-body text-sm text-charcoal">
               {mode === "bulk"
-                ? "Pick as many card photos as you want from your library."
-                : "Add front/back photos from your library, or take a new one."}
+                ? "Pick as many card photos as you want — each one will be scanned and filed."
+                : "Add photos from your library, or take a new one. Scan fills the form for you."}
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -301,94 +412,110 @@ export function AddCardForm() {
               ))}
             </div>
           )}
+
+          {mode === "single" && files.length > 0 && (
+            <button
+              type="button"
+              disabled={!scanEnabled || pending}
+              onClick={() => scanFirstPhotoMutation.mutate()}
+              className="cf-btn mt-4 w-full sm:w-auto"
+            >
+              {scanFirstPhotoMutation.isPending
+                ? "Scanning…"
+                : "Scan first photo"}
+            </button>
+          )}
         </section>
 
         {mode === "single" ? (
-          <>
-            <section className="cf-panel p-4 sm:p-5">
-              <h2 className="mb-4 font-display text-lg text-ink">Details</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Name / player" required>
-                  <input
-                    required={mode === "single"}
-                    value={form.player}
-                    onChange={(e) => update("player", e.target.value)}
-                    placeholder="Player or character name"
-                    className="cf-input"
-                  />
-                </Field>
-                <Field label="Category">
-                  <select
-                    value={form.sport}
-                    onChange={(e) => update("sport", e.target.value)}
-                    className="cf-input"
-                  >
-                    {CARD_CATEGORIES.map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Year" required>
-                  <input
-                    required={mode === "single"}
-                    type="number"
-                    value={form.year}
-                    onChange={(e) => update("year", e.target.value)}
-                    className="cf-input font-mono"
-                  />
-                </Field>
-                <Field label="Set name" required>
-                  <input
-                    required={mode === "single"}
-                    value={form.setName}
-                    onChange={(e) => update("setName", e.target.value)}
-                    className="cf-input"
-                  />
-                </Field>
-                <Field label="Card number">
-                  <input
-                    value={form.cardNumber}
-                    onChange={(e) => update("cardNumber", e.target.value)}
-                    className="cf-input font-mono"
-                  />
-                </Field>
-                <Field label="Variant">
-                  <input
-                    value={form.variant}
-                    onChange={(e) => update("variant", e.target.value)}
-                    className="cf-input"
-                  />
-                </Field>
-                <Field label="Quantity">
-                  <input
-                    type="number"
-                    min={1}
-                    value={form.quantity}
-                    onChange={(e) => update("quantity", e.target.value)}
-                    className="cf-input font-mono"
-                  />
-                </Field>
-                <Field label="Starting price (optional)">
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={form.startingPrice}
-                    onChange={(e) => update("startingPrice", e.target.value)}
-                    className="cf-input font-mono"
-                  />
-                </Field>
-              </div>
-            </section>
-          </>
+          <section className="cf-panel p-4 sm:p-5">
+            <h2 className="mb-4 font-display text-lg text-ink">Details</h2>
+            {scanNote && (
+              <p className="mb-4 border border-sage/40 bg-cream px-3 py-2 font-body text-sm text-sage">
+                {scanNote}
+              </p>
+            )}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Name / player" required>
+                <input
+                  required={mode === "single"}
+                  value={form.player}
+                  onChange={(e) => update("player", e.target.value)}
+                  placeholder="Player or character name"
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Category">
+                <select
+                  value={form.sport}
+                  onChange={(e) => update("sport", e.target.value)}
+                  className="cf-input"
+                >
+                  {CARD_CATEGORIES.map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Year" required>
+                <input
+                  required={mode === "single"}
+                  type="number"
+                  value={form.year}
+                  onChange={(e) => update("year", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+              <Field label="Set / brand" required>
+                <input
+                  required={mode === "single"}
+                  value={form.setName}
+                  onChange={(e) => update("setName", e.target.value)}
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Card number">
+                <input
+                  value={form.cardNumber}
+                  onChange={(e) => update("cardNumber", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+              <Field label="Variant">
+                <input
+                  value={form.variant}
+                  onChange={(e) => update("variant", e.target.value)}
+                  className="cf-input"
+                />
+              </Field>
+              <Field label="Quantity">
+                <input
+                  type="number"
+                  min={1}
+                  value={form.quantity}
+                  onChange={(e) => update("quantity", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+              <Field label="Starting price (optional)">
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.startingPrice}
+                  onChange={(e) => update("startingPrice", e.target.value)}
+                  className="cf-input font-mono"
+                />
+              </Field>
+            </div>
+          </section>
         ) : (
           <section className="cf-panel p-4 sm:p-5">
             <h2 className="mb-2 font-display text-lg text-ink">
-              Shared defaults
+              Fallback defaults
             </h2>
             <p className="mb-4 font-body text-sm text-charcoal">
-              Applied to every card. Names start from each photo filename — edit
-              them later in the catalog.
+              Used only when a scan can&apos;t read a field. With scanning on,
+              most cards fill themselves.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Category">
@@ -410,7 +537,7 @@ export function AddCardForm() {
                   className="cf-input font-mono"
                 />
               </Field>
-              <Field label="Set name (optional)">
+              <Field label="Set / brand (optional)">
                 <input
                   value={form.setName}
                   onChange={(e) => update("setName", e.target.value)}
@@ -487,7 +614,7 @@ export function AddCardForm() {
                 disabled={pending}
                 className="cf-btn cf-btn-primary w-full sm:w-auto"
               >
-                {pending ? "Saving…" : "Save card"}
+                {pending && singleMutation.isPending ? "Saving…" : "Save card"}
               </button>
               <button
                 type="button"

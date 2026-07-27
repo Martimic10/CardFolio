@@ -59,6 +59,19 @@ CLOUDINARY_API_SECRET=...
 
 Uploaded image URLs are stored on each `CardImage` row.
 
+## Card auto-scan (OpenAI Vision)
+
+Bulk import and “Scan first photo” read name, category, year, set/brand, and card number from each image.
+
+1. Create a key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Add to `.env` and Vercel:
+
+```env
+OPENAI_API_KEY=sk-...
+```
+
+Uses `gpt-4o-mini` vision. Without the key, bulk still works with filename/defaults.
+
 
 ## Scripts
 
