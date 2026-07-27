@@ -41,6 +41,18 @@ npx prisma migrate dev
 
 On Vercel, set the same `DATABASE_URL` and `DIRECT_URL` env vars.
 
+## Photo uploads
+
+- **Local (no token):** files save to `public/uploads/`
+- **Production:** uses [Vercel Blob](https://vercel.com/docs/storage/vercel-blob)
+
+1. In Vercel → **Storage** → create a **Blob** store
+2. Copy `BLOB_READ_WRITE_TOKEN` into Vercel env vars **and** local `.env`
+3. Redeploy / restart `npm run dev`
+
+Uploaded image URLs are stored on each `CardImage` row, so they keep working after deploy.
+
+
 ## Scripts
 
 | Command           | What it does                |
