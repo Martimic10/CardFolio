@@ -1,8 +1,11 @@
-import { put } from "@vercel/blob";
 import { randomUUID } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
+import {
+  isCloudinaryConfigured,
+  uploadImageBuffer,
+} from "@/lib/cloudinary";
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,29 +18,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No files uploaded" }, { status: 400 });
     }
 
-    const useBlob = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+    const useCloudinary = isCloudinaryConfigured();
     const urls: string[] = [];
 
-    if (!useBlob) {
+    if (!useCloudinary) {
       const uploadDir = path.join(process.cwd(), "public", "uploads");
       await mkdir(uploadDir, { recursive: true });
     }
 
     for (const file of files) {
       const ext = path.extname(file.name) || ".jpg";
-      const name = `cards/${randomUUID()}${ext}`;
+      const id = randomUUID();
       const buffer = Buffer.from(await file.arrayBuffer());
 
-      if (useBlob) {
-        const blob = await put(name, buffer, {
-          access: "public",
-          contentType: file.type || "image/jpeg",
-          addRandomSuffix: false,
-        });
-        urls.push(blob.url);
+      if (useCloudinary) {
+        const url = await uploadImageBuffer(buffer, id);
+        urls.push(url);
       } else {
-        const filename = path.basename(name);
-        await writeFile(path.join(process.cwd(), "public", "uploads", filename), buffer);
+        const filename = `${id}${ext}`;
+        await writeFile(
+          path.join(process.cwd(), "public", "uploads", filename),
+          buffer,
+        );
         urls.push(`/uploads/${filename}`);
       }
     }

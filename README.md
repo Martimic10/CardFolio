@@ -43,14 +43,21 @@ On Vercel, set the same `DATABASE_URL` and `DIRECT_URL` env vars.
 
 ## Photo uploads
 
-- **Local (no token):** files save to `public/uploads/`
-- **Production:** uses [Vercel Blob](https://vercel.com/docs/storage/vercel-blob)
+Uses [Cloudinary](https://cloudinary.com) (free tier). Without credentials, uploads fall back to `public/uploads/` locally.
 
-1. In Vercel → **Storage** → create a **Blob** store
-2. Copy `BLOB_READ_WRITE_TOKEN` into Vercel env vars **and** local `.env`
-3. Redeploy / restart `npm run dev`
+1. Create a free account at [cloudinary.com](https://cloudinary.com)
+2. From the dashboard, copy **Cloud name**, **API Key**, and **API Secret**
+3. Add to `.env` and Vercel:
 
-Uploaded image URLs are stored on each `CardImage` row, so they keep working after deploy.
+```env
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+4. Restart `npm run dev` / redeploy
+
+Uploaded image URLs are stored on each `CardImage` row.
 
 
 ## Scripts
