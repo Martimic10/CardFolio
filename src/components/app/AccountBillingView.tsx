@@ -89,35 +89,13 @@ export function AccountBillingView() {
       const res = await fetch("/api/billing/portal", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Portal failed");
-      if (data.mock) {
-        setMessage(
-          data.message ??
-            "Billing is in mock mode — use “Revert to Free” below to change plans.",
-        );
+      if (data.url) {
+        window.location.href = data.url;
         return;
       }
-      if (data.url) window.location.href = data.url;
+      throw new Error(data.message ?? "Could not open billing portal");
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Portal failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function mockDowngrade() {
-    setBusy(true);
-    try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "free" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed");
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      setMessage("Plan set back to Free (mock billing).");
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Failed");
     } finally {
       setBusy(false);
     }
@@ -326,27 +304,10 @@ export function AccountBillingView() {
                 {busy ? "Opening…" : "Manage subscription"}
               </button>
             )}
-            {me.billingMock && me.hasProAccess && (
-              <button
-                type="button"
-                className="cf-btn"
-                disabled={busy}
-                onClick={() => mockDowngrade()}
-              >
-                Revert to Free (mock)
-              </button>
-            )}
             <Link href="/app/collection" className="cf-btn">
               Back to dashboard
             </Link>
           </div>
-
-          {me.billingMock && (
-            <p className="font-mono text-[0.65rem] tracking-wide text-sage uppercase">
-              Billing mock mode — upgrades apply instantly until Stripe keys are
-              added.
-            </p>
-          )}
         </div>
       </section>
 

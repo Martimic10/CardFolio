@@ -53,4 +53,6 @@ export type CardListItem = {
   grade: number | null;
   estimatedValue: number | null;
   createdAt: string;
+  priceChangePct?: number | null;
+  priceSpark?: number[];
 };

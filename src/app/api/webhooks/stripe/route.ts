@@ -4,31 +4,11 @@ import { getStripe, isBillingMockMode, planFromPriceId } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
-  // Mock mode: accept JSON body that simulates Stripe events for local testing.
   if (isBillingMockMode()) {
-    try {
-      const body = await request.json();
-      const userId = body.userId as string | undefined;
-      const plan = body.plan as string | undefined;
-      if (!userId || !plan) {
-        return NextResponse.json(
-          { error: "Mock webhook expects { userId, plan }" },
-          { status: 400 },
-        );
-      }
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          plan,
-          stripeSubscriptionId:
-            plan === "pro_monthly" ? `mock_sub_${userId}` : null,
-        },
-      });
-      return NextResponse.json({ received: true, mock: true });
-    } catch (error) {
-      console.error(error);
-      return NextResponse.json({ error: "Mock webhook failed" }, { status: 400 });
-    }
+    return NextResponse.json(
+      { error: "Stripe webhooks require BILLING_MOCK=false and STRIPE_WEBHOOK_SECRET." },
+      { status: 503 },
+    );
   }
 
   const stripe = getStripe();

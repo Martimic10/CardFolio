@@ -8,11 +8,10 @@ export function FooterCta() {
           Ready to file your collection?
         </h2>
         <p className="mx-auto mb-6 max-w-md text-sm leading-relaxed text-charcoal sm:mb-8 md:text-base">
-          Early access is limited. Leave your email and we&apos;ll send an
-          invite when a spot opens.
+          Create a free account and start cataloguing your cards in minutes.
         </p>
         <Link
-          href="/app"
+          href="/sign-up"
           className="inline-flex min-h-11 items-center justify-center border-2 border-ink bg-ink px-5 py-2.5 font-body text-sm font-medium text-paper no-underline transition-opacity hover:opacity-90"
         >
           Get Started

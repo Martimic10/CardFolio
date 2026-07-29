@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UnauthorizedError, getAppUser } from "@/lib/auth";
-import { getStripe, isBillingMockMode, planFromPriceId } from "@/lib/billing";
+import { getStripe, planFromPriceId } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -9,10 +9,6 @@ import { prisma } from "@/lib/prisma";
  */
 export async function POST(request: NextRequest) {
   try {
-    if (isBillingMockMode()) {
-      return NextResponse.json({ ok: true, mock: true });
-    }
-
     const user = await getAppUser();
     const body = await request.json();
     const sessionId = body.sessionId as string | undefined;

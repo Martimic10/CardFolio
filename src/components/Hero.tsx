@@ -17,7 +17,7 @@ export function Hero() {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/app"
+            href="/sign-up"
             className="inline-flex min-h-11 items-center justify-center border-2 border-ink bg-ink px-4 py-2.5 text-center font-body text-sm font-medium text-paper no-underline transition-opacity hover:opacity-90 sm:px-5"
           >
             Get Started

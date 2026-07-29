@@ -1,28 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UnauthorizedError, getAppUser } from "@/lib/auth";
 import { calculateGrade } from "@/lib/condition";
+import { cardTrendFields } from "@/lib/market-insights";
 import { FREE_CARD_LIMIT, hasProAccess } from "@/lib/plans";
 import { getPriceEstimate } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import { createCardSchema } from "@/lib/validators";
 
-function mapCard(card: {
-  id: string;
-  player: string;
-  sport: string;
-  year: number;
-  brand: string | null;
-  setName: string;
-  cardNumber: string | null;
-  variant: string | null;
-  quantity: number;
-  createdAt: Date;
-  images: { url: string; side: string }[];
-  conditions: { grade: number }[];
-  prices: { amount: number }[];
-}) {
+function mapCard(
+  card: {
+    id: string;
+    player: string;
+    sport: string;
+    year: number;
+    brand: string | null;
+    setName: string;
+    cardNumber: string | null;
+    variant: string | null;
+    quantity: number;
+    createdAt: Date;
+    images: { url: string; side: string }[];
+    conditions: { grade: number }[];
+    prices: { amount: number; createdAt: Date }[];
+  },
+  opts: { includeTrends: boolean },
+) {
   const front =
     card.images.find((i) => i.side === "front") ?? card.images[0] ?? null;
+  const trends = opts.includeTrends
+    ? cardTrendFields(card.prices)
+    : { priceChangePct: null, priceSpark: [] as number[] };
   return {
     id: card.id,
     player: card.player,
@@ -37,6 +44,8 @@ function mapCard(card: {
     grade: card.conditions[0]?.grade ?? null,
     estimatedValue: card.prices[0]?.amount ?? null,
     createdAt: card.createdAt.toISOString(),
+    priceChangePct: trends.priceChangePct,
+    priceSpark: trends.priceSpark,
   };
 }
 
@@ -51,6 +60,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getAppUser();
     const userId = user.id;
+    const includeTrends = hasProAccess(user);
     const { searchParams } = request.nextUrl;
     const q = searchParams.get("q")?.trim() ?? "";
     const sport = searchParams.get("sport") ?? "";
@@ -78,11 +88,14 @@ export async function GET(request: NextRequest) {
       include: {
         images: { orderBy: { createdAt: "asc" } },
         conditions: { orderBy: { createdAt: "desc" }, take: 1 },
-        prices: { orderBy: { createdAt: "desc" }, take: 1 },
+        prices: {
+          orderBy: { createdAt: "desc" },
+          take: includeTrends ? 12 : 1,
+        },
       },
     });
 
-    let mapped = cards.map(mapCard);
+    let mapped = cards.map((c) => mapCard(c, { includeTrends }));
 
     if (minValue) {
       const min = Number(minValue);
@@ -219,7 +232,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ card: mapCard(card) }, { status: 201 });
+    return NextResponse.json(
+      { card: mapCard(card, { includeTrends: hasProAccess(user) }) },
+      { status: 201 },
+    );
   } catch (error) {
     const unauthorized = authError(error);
     if (unauthorized) return unauthorized;

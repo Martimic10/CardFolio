@@ -7,7 +7,7 @@ import {
   priceIdForPlan,
   stripeConfigured,
 } from "@/lib/billing";
-import { hasProAccess, isValidPlan, type PlanId } from "@/lib/plans";
+import { hasProAccess } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
@@ -27,34 +27,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mock billing: instantly grant the plan (no Stripe keys required).
-    if (isBillingMockMode()) {
-      const updated = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          plan,
-          stripeCustomerId: user.stripeCustomerId ?? `mock_cus_${user.id}`,
-          stripeSubscriptionId:
-            plan === "pro_monthly" ? `mock_sub_${user.id}` : null,
+    if (isBillingMockMode() || !stripeConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Stripe is not configured. Add STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_LIFETIME, and set BILLING_MOCK=false.",
         },
-      });
-
-      return NextResponse.json({
-        mock: true,
-        plan: updated.plan,
-        url: `${appUrl()}/app/account?upgraded=1`,
-      });
+        { status: 503 },
+      );
     }
 
     const stripe = getStripe();
     const priceId = priceIdForPlan(plan);
     if (!stripe || !priceId) {
       return NextResponse.json(
-        {
-          error: stripeConfigured()
-            ? "Stripe client failed to initialize"
-            : "Stripe is not fully configured. Add STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, and STRIPE_PRICE_PRO_LIFETIME, then set BILLING_MOCK=false.",
-        },
+        { error: "Stripe client failed to initialize" },
         { status: 503 },
       );
     }
@@ -102,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ url: session.url, mock: false });
+    return NextResponse.json({ url: session.url });
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -111,34 +98,5 @@ export async function POST(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Failed to start checkout";
     return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
-/** Dev helper: set plan without checkout (mock only). */
-export async function PATCH(request: NextRequest) {
-  try {
-    if (!isBillingMockMode()) {
-      return NextResponse.json({ error: "Mock only" }, { status: 403 });
-    }
-    const user = await getAppUser();
-    const body = await request.json();
-    const plan = body.plan as string;
-    if (!isValidPlan(plan)) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
-    }
-    const updated = await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        plan: plan as PlanId,
-        stripeSubscriptionId:
-          plan === "pro_monthly" ? `mock_sub_${user.id}` : null,
-      },
-    });
-    return NextResponse.json({ plan: updated.plan });
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ const isProtectedRoute = createRouteMatcher([
   "/api/upload(.*)",
   "/api/billing(.*)",
   "/api/me(.*)",
+  "/api/market(.*)",
 ]);
 
 const hasClerkKeys = Boolean(

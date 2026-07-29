@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
 import { UnauthorizedError, getAppUser } from "@/lib/auth";
-import { appUrl, getStripe, isBillingMockMode } from "@/lib/billing";
+import { appUrl, getStripe, isBillingMockMode, stripeConfigured } from "@/lib/billing";
 
 export async function POST() {
   try {
     const user = await getAppUser();
 
-    if (isBillingMockMode()) {
-      return NextResponse.json({
-        mock: true,
-        message:
-          "Billing is in mock mode. Use the account page to change plans without Stripe.",
-        url: `${appUrl()}/app/account`,
-      });
+    if (isBillingMockMode() || !stripeConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Stripe is not configured. Add Stripe keys and set BILLING_MOCK=false.",
+        },
+        { status: 503 },
+      );
     }
 
-    if (!user.stripeCustomerId) {
+    if (!user.stripeCustomerId || user.stripeCustomerId.startsWith("mock_cus_")) {
       return NextResponse.json(
-        { error: "No Stripe customer on file" },
+        { error: "No Stripe customer on file. Upgrade once to create a billing profile." },
         { status: 400 },
       );
     }

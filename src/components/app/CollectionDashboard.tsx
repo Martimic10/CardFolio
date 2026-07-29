@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCards, fetchMe, fetchSummary } from "@/lib/api";
+import { fetchCards, fetchMe, fetchMarketInsights, fetchSummary } from "@/lib/api";
 import {
   CATEGORY_FILTER_OPTIONS,
   categoryShortCode,
@@ -45,6 +45,14 @@ export function CollectionDashboard() {
   });
 
   const hasPro = meQuery.data?.hasProAccess ?? false;
+
+  const marketQuery = useQuery({
+    queryKey: ["market"],
+    queryFn: fetchMarketInsights,
+    enabled: hasPro,
+    retry: false,
+  });
+
   const cards = useMemo(() => {
     let list = cardsQuery.data ?? [];
     if (conditionFilter === "graded") {
@@ -120,13 +128,27 @@ export function CollectionDashboard() {
           label="30-day change"
           locked={!hasPro}
           onUnlock={() => setUpgradeOpen(true)}
-          value="+4.2%"
+          value={
+            marketQuery.isLoading
+              ? "…"
+              : marketQuery.data?.insights.change30dPct != null
+                ? `${marketQuery.data.insights.change30dPct >= 0 ? "+" : ""}${marketQuery.data.insights.change30dPct.toFixed(1)}%`
+                : "—"
+          }
         />
         <StatCard
           label="Top mover"
           locked={!hasPro}
           onUnlock={() => setUpgradeOpen(true)}
-          value="—"
+          value={
+            marketQuery.isLoading
+              ? "…"
+              : marketQuery.data?.insights.topMover
+                ? `${marketQuery.data.insights.topMover.player} ${
+                    marketQuery.data.insights.topMover.change >= 0 ? "+" : ""
+                  }${marketQuery.data.insights.topMover.change.toFixed(1)}%`
+                : "—"
+          }
         />
       </div>
 
@@ -296,7 +318,10 @@ export function CollectionDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       {hasPro ? (
-                        <TrendPlaceholder />
+                        <CardTrend
+                          change={card.priceChangePct}
+                          spark={card.priceSpark}
+                        />
                       ) : (
                         <button
                           type="button"
@@ -394,7 +419,7 @@ function StatCard({
         <p
           className={`mt-2 font-mono text-xl font-medium tabular-nums ${
             accent ? "text-stamp" : "text-ink"
-          }`}
+          } line-clamp-2 break-words text-[1.05rem] leading-snug`}
         >
           {value}
         </p>
@@ -456,12 +481,41 @@ function Thumb({ url, large }: { url: string | null; large?: boolean }) {
   );
 }
 
-function TrendPlaceholder() {
+function CardTrend({
+  change,
+  spark,
+}: {
+  change?: number | null;
+  spark?: number[];
+}) {
+  if (change == null || !spark || spark.length < 2) {
+    return <span className="font-mono text-xs text-sage">—</span>;
+  }
+  const up = change >= 0;
+  const min = Math.min(...spark);
+  const max = Math.max(...spark);
+  const range = Math.max(0.001, max - min);
+  const w = 40;
+  const h = 16;
+  const line = spark
+    .map((v, i) => {
+      const x = (i / Math.max(1, spark.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      return `${i === 0 ? "M" : "L"}${x} ${y}`;
+    })
+    .join(" ");
+
   return (
     <span className="inline-flex items-center gap-1.5">
-      <svg width="40" height="16" viewBox="0 0 40 16" aria-hidden className="text-sage">
+      <svg
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        aria-hidden
+        className={up ? "text-sage" : "text-stamp"}
+      >
         <path
-          d="M1 12 L10 8 L18 10 L28 4 L39 6"
+          d={line}
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
@@ -469,7 +523,14 @@ function TrendPlaceholder() {
           strokeLinejoin="round"
         />
       </svg>
-      <span className="font-mono text-xs tabular-nums text-sage">—</span>
+      <span
+        className={`font-mono text-xs tabular-nums ${
+          up ? "text-sage" : "text-stamp"
+        }`}
+      >
+        {up ? "+" : ""}
+        {change.toFixed(1)}%
+      </span>
     </span>
   );
 }

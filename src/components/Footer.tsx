@@ -3,8 +3,8 @@ import Link from "next/link";
 const links = [
   { href: "/#how-it-works", label: "How it works" },
   { href: "/#features", label: "Features" },
+  { href: "/#pricing", label: "Pricing" },
   { href: "/#faq", label: "FAQ" },
-  { href: "/waitlist", label: "Early access" },
 ];
 
 export function Footer() {
@@ -54,10 +54,7 @@ export function Footer() {
 
         <div className="flex flex-col gap-2 border-t border-dashed border-ink/25 px-6 py-4 md:flex-row md:items-center md:justify-between md:px-8">
           <p className="font-mono text-[0.65rem] tracking-wide text-charcoal/60">
-            © {new Date().getFullYear()} Cardfolio · Filed for early access
-          </p>
-          <p className="font-mono text-[0.65rem] tracking-[0.1em] text-charcoal/50">
-            REF · CF-LANDING
+            © {new Date().getFullYear()} Cardfolio
           </p>
         </div>
       </div>

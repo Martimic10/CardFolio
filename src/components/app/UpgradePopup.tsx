@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { PRO_PLANS, type PlanId } from "@/lib/plans";
 
 type Props = {
@@ -11,7 +10,6 @@ type Props = {
 };
 
 export function UpgradePopup({ open, onClose, reason }: Props) {
-  const queryClient = useQueryClient();
   const [loading, setLoading] = useState<PlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,12 +27,6 @@ export function UpgradePopup({ open, onClose, reason }: Props) {
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error ?? "Checkout failed");
-      }
-      await queryClient.invalidateQueries({ queryKey: ["me"] });
-      if (data.mock) {
-        onClose();
-        window.location.href = data.url ?? "/app/account?upgraded=1";
-        return;
       }
       if (data.url) {
         window.location.href = data.url;

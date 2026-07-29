@@ -57,6 +57,53 @@ export async function fetchSummary() {
   }>(await fetch("/api/cards/summary"));
 }
 
+export type MarketInsightsResponse = {
+  insights: {
+    totalValue: number;
+    change30dPct: number | null;
+    change30dAmount: number | null;
+    topMover: {
+      cardId: string;
+      player: string;
+      setName: string;
+      sport: string;
+      price: number;
+      change: number;
+      spark: number[];
+    } | null;
+    gainers: {
+      cardId: string;
+      player: string;
+      setName: string;
+      sport: string;
+      price: number;
+      change: number;
+      spark: number[];
+    }[];
+    losers: {
+      cardId: string;
+      player: string;
+      setName: string;
+      sport: string;
+      price: number;
+      change: number;
+      spark: number[];
+    }[];
+    setTrends: {
+      name: string;
+      sport: string;
+      change: number;
+      cardCount: number;
+    }[];
+    indexSpark: number[];
+    cardsWithHistory: number;
+  };
+};
+
+export async function fetchMarketInsights() {
+  return parseJson<MarketInsightsResponse>(await fetch("/api/market"));
+}
+
 export async function fetchCard(id: string) {
   const data = await parseJson<{ card: CardDetail }>(
     await fetch(`/api/cards/${id}`),
