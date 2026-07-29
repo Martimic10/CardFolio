@@ -20,9 +20,9 @@ const faqs = [
       "Front alone is usually enough. The back helps when the set year or parallel is ambiguous. You can add a second photo later without redoing the entry.",
   },
   {
-    question: "Is early access free?",
+    question: "Is Cardfolio free?",
     answer:
-      "Yes during the waitlist period. Pricing for general release has not been set. Early access users will hear first when plans open.",
+      "Yes — Free includes up to 50 cards with manual cataloging and price entry. Pro Monthly ($8/mo) or Pro Lifetime ($160 once) unlocks unlimited cards, auto pricing, price history, and market trends.",
   },
 ];
 

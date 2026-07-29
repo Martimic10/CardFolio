@@ -7,12 +7,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteCard,
   fetchCard,
+  fetchMe,
   saveCondition,
   savePrice,
   updateCard,
 } from "@/lib/api";
 import { calculateGrade, gradeLabel } from "@/lib/condition";
 import { formatCurrency } from "@/lib/pricing";
+import { UpgradePopup } from "@/components/app/UpgradePopup";
 
 export function CardDetailView({ id }: { id: string }) {
   const router = useRouter();
@@ -21,7 +23,12 @@ export function CardDetailView({ id }: { id: string }) {
     queryKey: ["card", id],
     queryFn: () => fetchCard(id),
   });
-
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+  });
+  const hasPro = meQuery.data?.hasProAccess ?? false;
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     player: "",
@@ -378,7 +385,46 @@ export function CardDetailView({ id }: { id: string }) {
             </form>
 
             <h3 className="cf-label mb-2">History</h3>
-            {card.prices.length === 0 ? (
+            {!hasPro ? (
+              <div className="relative overflow-hidden border-2 border-ink/20 bg-cream">
+                <div className="pointer-events-none select-none blur-[2px] opacity-50">
+                  <table className="w-full text-left font-body text-sm">
+                    <thead>
+                      <tr>
+                        <th className="px-3 py-2">
+                          <span className="cf-label">Date</span>
+                        </th>
+                        <th className="px-3 py-2">
+                          <span className="cf-label">Amount</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-ink/15">
+                        <td className="px-3 py-2">01/15/2026</td>
+                        <td className="px-3 py-2 font-mono">$24.00</td>
+                      </tr>
+                      <tr className="border-t border-ink/15">
+                        <td className="px-3 py-2">03/02/2026</td>
+                        <td className="px-3 py-2 font-mono">$31.50</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-paper/80 px-4 text-center">
+                  <p className="font-body text-sm text-ink">
+                    Price history over time is a Pro feature.
+                  </p>
+                  <button
+                    type="button"
+                    className="cf-btn cf-btn-primary"
+                    onClick={() => setUpgradeOpen(true)}
+                  >
+                    Unlock with Pro
+                  </button>
+                </div>
+              </div>
+            ) : card.prices.length === 0 ? (
               <p className="font-body text-sm text-charcoal">
                 No price entries yet.
               </p>
@@ -419,6 +465,12 @@ export function CardDetailView({ id }: { id: string }) {
           </section>
         </div>
       </div>
+
+      <UpgradePopup
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        reason="Pro unlocks full price history and automatic market estimates."
+      />
     </div>
   );
 }

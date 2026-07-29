@@ -1,5 +1,6 @@
 /**
  * Pluggable price estimate. Placeholder heuristic until live comps are wired.
+ * Pro-gated automatic lookup — free users only get a value when they enter one manually.
  */
 export function estimatePrice(input: {
   year: number;
@@ -40,6 +41,28 @@ export function estimatePrice(input: {
   }
 
   return round2(base);
+}
+
+/**
+ * Automatic comps/estimate lookup. Gate behind Pro so free users never trigger
+ * paid API calls once this is wired to a real provider.
+ */
+export function getPriceEstimate(
+  input: {
+    year: number;
+    sport: string;
+    grade?: number | null;
+    startingPrice?: number | null;
+  },
+  opts: { hasProAccess: boolean },
+): { amount: number; source: string } | null {
+  if (input.startingPrice != null && input.startingPrice > 0) {
+    return { amount: round2(input.startingPrice), source: "manual" };
+  }
+  if (!opts.hasProAccess) {
+    return null;
+  }
+  return { amount: estimatePrice(input), source: "estimate" };
 }
 
 function round2(n: number) {

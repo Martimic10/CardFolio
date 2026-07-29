@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 const links = [
   { href: "/app/collection", label: "Collection" },
   { href: "/app/cards/new", label: "Add card" },
+  { href: "/app/account", label: "Account" },
 ];
 
 export function AppMobileMenu() {

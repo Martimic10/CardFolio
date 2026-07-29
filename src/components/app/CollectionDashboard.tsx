@@ -3,24 +3,22 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchCards, fetchSummary } from "@/lib/api";
+import { fetchCards, fetchMe, fetchSummary } from "@/lib/api";
 import {
   CATEGORY_FILTER_OPTIONS,
   categoryShortCode,
 } from "@/lib/categories";
+import { gradeLabel } from "@/lib/condition";
 import { formatCurrency } from "@/lib/pricing";
-import type { CardListItem } from "@/lib/validators";
-
-type ViewMode = "table" | "grid";
+import { UpgradePopup } from "@/components/app/UpgradePopup";
 
 export function CollectionDashboard() {
-  const [view, setView] = useState<ViewMode>("table");
   const [q, setQ] = useState("");
   const [sport, setSport] = useState("");
   const [sort, setSort] = useState("createdAt");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
-  const [minValue, setMinValue] = useState("");
-  const [maxValue, setMaxValue] = useState("");
+  const [conditionFilter, setConditionFilter] = useState("");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const params = useMemo(() => {
     const p = new URLSearchParams();
@@ -28,10 +26,8 @@ export function CollectionDashboard() {
     if (sport) p.set("sport", sport);
     p.set("sort", sort);
     p.set("order", order);
-    if (minValue) p.set("minValue", minValue);
-    if (maxValue) p.set("maxValue", maxValue);
     return p;
-  }, [q, sport, sort, order, minValue, maxValue]);
+  }, [q, sport, sort, order]);
 
   const cardsQuery = useQuery({
     queryKey: ["cards", params.toString()],
@@ -43,46 +39,67 @@ export function CollectionDashboard() {
     queryFn: fetchSummary,
   });
 
-  function toggleSort(column: string) {
-    if (sort === column) {
-      setOrder((o) => (o === "asc" ? "desc" : "asc"));
-    } else {
-      setSort(column);
-      setOrder(column === "player" || column === "setName" ? "asc" : "desc");
-    }
-  }
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+  });
 
-  const cards = cardsQuery.data ?? [];
+  const hasPro = meQuery.data?.hasProAccess ?? false;
+  const cards = useMemo(() => {
+    let list = cardsQuery.data ?? [];
+    if (conditionFilter === "graded") {
+      list = list.filter((c) => c.grade != null && c.grade >= 7);
+    } else if (conditionFilter === "raw") {
+      list = list.filter((c) => c.grade == null || c.grade < 7);
+    }
+    return list;
+  }, [cardsQuery.data, conditionFilter]);
+
+  const lastAdded =
+    cardsQuery.data && cardsQuery.data.length > 0
+      ? new Date(
+          [...cardsQuery.data].sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )[0]!.createdAt,
+        ).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : null;
+
+  const uniqueCount = summaryQuery.data?.uniqueCards ?? 0;
   const isEmpty =
     !cardsQuery.isLoading &&
-    cards.length === 0 &&
+    (cardsQuery.data?.length ?? 0) === 0 &&
     !q &&
     !sport &&
-    !minValue &&
-    !maxValue;
+    !conditionFilter;
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto w-full max-w-6xl space-y-5 min-[900px]:space-y-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <p className="cf-label mb-2">Catalog index</p>
-          <h1 className="font-display text-2xl text-ink sm:text-3xl md:text-4xl">
-            Collection
+          <h1 className="font-display text-2xl text-ink min-[900px]:text-3xl">
+            Dashboard
           </h1>
-          <p className="mt-2 max-w-md text-sm text-charcoal">
-            Sports and TCG — browse, search, and manage every card you&apos;ve
-            filed.
+          <p className="mt-2 font-body text-sm text-charcoal">
+            <span className="font-mono tabular-nums">{uniqueCount}</span> cards
+            {lastAdded ? ` · Last added ${lastAdded}` : ""}
           </p>
         </div>
-        <div className="hidden md:block">
-          <Link href="/app/cards/new" className="cf-btn cf-btn-primary">
-            Add card
-          </Link>
-        </div>
+        <Link
+          href="/app/cards/new"
+          className="cf-btn cf-btn-primary hidden shadow-[3px_3px_0_rgba(34,40,58,0.15)] min-[900px]:inline-flex"
+        >
+          + Add card
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SummaryCard
+      <div className="grid grid-cols-2 gap-3 min-[900px]:grid-cols-4">
+        <StatCard
           label="Total cards"
           value={
             summaryQuery.isLoading
@@ -90,15 +107,7 @@ export function CollectionDashboard() {
               : String(summaryQuery.data?.totalCards ?? 0)
           }
         />
-        <SummaryCard
-          label="Unique entries"
-          value={
-            summaryQuery.isLoading
-              ? "—"
-              : String(summaryQuery.data?.uniqueCards ?? 0)
-          }
-        />
-        <SummaryCard
+        <StatCard
           label="Estimated value"
           value={
             summaryQuery.isLoading
@@ -107,339 +116,374 @@ export function CollectionDashboard() {
           }
           accent
         />
+        <StatCard
+          label="30-day change"
+          locked={!hasPro}
+          onUnlock={() => setUpgradeOpen(true)}
+          value="+4.2%"
+        />
+        <StatCard
+          label="Top mover"
+          locked={!hasPro}
+          onUnlock={() => setUpgradeOpen(true)}
+          value="—"
+        />
       </div>
 
-      <div className="cf-panel p-3 sm:p-4 md:p-5">
-        <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="cf-label">Search</span>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Name, set, or number"
-              className="cf-input"
-              inputMode="search"
-            />
-          </label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="flex flex-col gap-1.5 sm:col-span-2 lg:col-span-1">
-              <span className="cf-label">Category</span>
-              <select
-                value={sport}
-                onChange={(e) => setSport(e.target.value)}
-                className="cf-input"
-              >
-                {CATEGORY_FILTER_OPTIONS.map((s) => (
-                  <option key={s || "all"} value={s}>
-                    {s || "All categories"}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="cf-label">Min value</span>
-              <input
-                type="number"
-                min={0}
-                value={minValue}
-                onChange={(e) => setMinValue(e.target.value)}
-                className="cf-input font-mono"
-              />
-            </label>
-            <label className="flex flex-col gap-1.5">
-              <span className="cf-label">Max value</span>
-              <input
-                type="number"
-                min={0}
-                value={maxValue}
-                onChange={(e) => setMaxValue(e.target.value)}
-                className="cf-input font-mono"
-              />
-            </label>
-            <div className="flex border-2 border-ink self-end">
-              <button
-                type="button"
-                onClick={() => setView("table")}
-                className={`min-h-11 flex-1 px-3 py-2 font-body text-sm sm:flex-none ${
-                  view === "table"
-                    ? "bg-ink text-paper"
-                    : "bg-paper text-charcoal"
-                }`}
-              >
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("grid")}
-                className={`min-h-11 flex-1 border-l-2 border-ink px-3 py-2 font-body text-sm sm:flex-none ${
-                  view === "grid"
-                    ? "bg-ink text-paper"
-                    : "bg-paper text-charcoal"
-                }`}
-              >
-                Grid
-              </button>
-            </div>
+      {meQuery.data && !hasPro && (
+        <div className="flex flex-col gap-3 border-2 border-ink bg-paper p-4 min-[900px]:flex-row min-[900px]:items-center min-[900px]:justify-between">
+          <div>
+            <h2 className="font-display text-lg text-ink">
+              Unlock market insights with Pro
+            </h2>
+            <p className="mt-1 max-w-xl font-body text-sm text-charcoal">
+              See 30-day value changes, top movers, price history, and market
+              trends. Free includes up to {meQuery.data.cardLimit} cards (
+              {meQuery.data.uniqueCards}/{meQuery.data.cardLimit} used).
+            </p>
           </div>
-        </div>
-      </div>
-
-      {cardsQuery.isLoading && (
-        <div className="cf-panel px-6 py-16 text-center font-body text-sm text-charcoal">
-          Loading collection…
-        </div>
-      )}
-
-      {cardsQuery.isError && (
-        <div className="border-2 border-stamp bg-paper px-6 py-4 font-body text-sm text-stamp">
-          Couldn&apos;t load your cards.{" "}
           <button
             type="button"
-            className="underline"
-            onClick={() => cardsQuery.refetch()}
+            onClick={() => setUpgradeOpen(true)}
+            className="cf-btn cf-btn-primary shrink-0"
           >
-            Try again
+            Upgrade to Pro
           </button>
         </div>
       )}
 
-      {isEmpty && (
-        <div className="cf-panel border-dashed px-6 py-16 text-center">
-          <h2 className="font-display text-xl text-ink">No cards yet</h2>
-          <p className="mx-auto mt-2 max-w-sm font-body text-sm text-charcoal">
-            Add your first sports or TCG card to start building the catalog.
-          </p>
-          <Link href="/app/cards/new" className="cf-btn cf-btn-primary mt-6">
-            Add your first card
-          </Link>
+      <section className="cf-panel overflow-hidden">
+        <div className="flex flex-col gap-3 border-b-2 border-ink bg-cream/50 p-3 min-[900px]:flex-row min-[900px]:items-center min-[900px]:p-4">
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search player, set, brand…"
+            className="cf-input min-[900px]:max-w-xs"
+          />
+          <div className="flex flex-wrap gap-2">
+            <FilterChip
+              active={!sport}
+              onClick={() => setSport("")}
+              label="All"
+            />
+            {CATEGORY_FILTER_OPTIONS.filter(Boolean)
+              .slice(0, 6)
+              .map((c) => (
+                <FilterChip
+                  key={c}
+                  active={sport === c}
+                  onClick={() => setSport(sport === c ? "" : c)}
+                  label={categoryShortCode(c)}
+                />
+              ))}
+            <FilterChip
+              active={conditionFilter === "graded"}
+              onClick={() =>
+                setConditionFilter((v) => (v === "graded" ? "" : "graded"))
+              }
+              label="Graded"
+            />
+            <select
+              value={`${sort}:${order}`}
+              onChange={(e) => {
+                const [s, o] = e.target.value.split(":") as [
+                  string,
+                  "asc" | "desc",
+                ];
+                setSort(s);
+                setOrder(o);
+              }}
+              className="border-1.5 border border-ink bg-cream px-2 py-1.5 font-mono text-xs text-ink"
+            >
+              <option value="createdAt:desc">Newest</option>
+              <option value="value:desc">Value ↓</option>
+              <option value="value:asc">Value ↑</option>
+              <option value="player:asc">Player A–Z</option>
+              <option value="year:desc">Year ↓</option>
+            </select>
+          </div>
         </div>
-      )}
 
-      {!cardsQuery.isLoading &&
-        !cardsQuery.isError &&
-        !isEmpty &&
-        cards.length === 0 && (
-          <div className="cf-panel px-6 py-12 text-center font-body text-sm text-charcoal">
-            No cards match these filters.
+        {cardsQuery.isLoading && (
+          <p className="px-4 py-16 text-center font-body text-sm text-charcoal">
+            Loading collection…
+          </p>
+        )}
+
+        {cardsQuery.isError && (
+          <p className="px-4 py-10 text-center font-body text-sm text-stamp">
+            Couldn&apos;t load your cards.{" "}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => cardsQuery.refetch()}
+            >
+              Try again
+            </button>
+          </p>
+        )}
+
+        {isEmpty && (
+          <div className="border-t border-dashed border-manila px-4 py-16 text-center">
+            <h2 className="font-display text-xl text-ink">No cards yet</h2>
+            <p className="mx-auto mt-2 max-w-sm font-body text-sm text-charcoal">
+              Add your first sports or TCG card to start building the catalog.
+            </p>
+            <Link href="/app/cards/new" className="cf-btn cf-btn-primary mt-6">
+              Add your first card
+            </Link>
           </div>
         )}
 
-      {!cardsQuery.isLoading && cards.length > 0 && view === "table" && (
-        <CardTable cards={cards} sort={sort} order={order} onSort={toggleSort} />
-      )}
+        {!cardsQuery.isLoading &&
+          !cardsQuery.isError &&
+          !isEmpty &&
+          cards.length === 0 && (
+            <p className="px-4 py-12 text-center font-body text-sm text-charcoal">
+              No cards match these filters.
+            </p>
+          )}
 
-      {!cardsQuery.isLoading && cards.length > 0 && view === "grid" && (
-        <CardGrid cards={cards} />
-      )}
+        {cards.length > 0 && (
+          <div className="hidden min-[900px]:block">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-ink/20 bg-cream">
+                  {["Card", "Sport", "Condition", "Price", "Trend"].map((h) => (
+                    <th key={h} className="px-4 py-2.5">
+                      <span className="cf-label">{h}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {cards.map((card) => (
+                  <tr
+                    key={card.id}
+                    className="border-b border-ink/10 last:border-b-0 hover:bg-cream/40"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/app/cards/${card.id}`}
+                        className="flex items-center gap-3 no-underline"
+                      >
+                        <Thumb url={card.thumbnailUrl} />
+                        <span className="min-w-0">
+                          <span className="block truncate font-body text-sm font-medium text-ink">
+                            {card.player}
+                          </span>
+                          <span className="block truncate font-body text-xs text-charcoal">
+                            {card.year}
+                            {card.brand ? ` · ${card.brand}` : ""} ·{" "}
+                            {card.setName}
+                          </span>
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 font-body text-sm text-charcoal">
+                      {card.sport}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ConditionPill grade={card.grade} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm font-medium tabular-nums text-stamp">
+                        {card.estimatedValue != null
+                          ? formatCurrency(card.estimatedValue)
+                          : "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {hasPro ? (
+                        <TrendPlaceholder />
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setUpgradeOpen(true)}
+                          className="inline-flex items-center gap-1 border border-ink/25 bg-cream px-2 py-1 font-mono text-[0.65rem] text-sage uppercase"
+                        >
+                          <LockIcon /> Pro
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {cards.length > 0 && (
+          <ul className="divide-y divide-ink/10 min-[900px]:hidden">
+            {cards.map((card) => (
+              <li key={card.id}>
+                <Link
+                  href={`/app/cards/${card.id}`}
+                  className="flex gap-3 px-3 py-3 no-underline"
+                >
+                  <Thumb url={card.thumbnailUrl} large />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-start justify-between gap-2">
+                      <span className="truncate font-body text-sm font-medium text-ink">
+                        {card.player}
+                      </span>
+                      <span className="shrink-0 font-mono text-sm font-medium tabular-nums text-stamp">
+                        {card.estimatedValue != null
+                          ? formatCurrency(card.estimatedValue)
+                          : "—"}
+                      </span>
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="truncate font-body text-xs text-charcoal">
+                        {card.setName}
+                      </span>
+                      <ConditionPill grade={card.grade} />
+                      {!hasPro && (
+                        <span className="inline-flex items-center gap-0.5 border border-ink/20 bg-cream px-1.5 py-0.5 font-mono text-[0.55rem] text-sage uppercase">
+                          <LockIcon /> Pro
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <UpgradePopup
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        reason="Upgrade for market trends, 30-day value change, and price history."
+      />
     </div>
   );
 }
 
-function SummaryCard({
+function StatCard({
   label,
   value,
+  locked,
+  onUnlock,
   accent,
 }: {
   label: string;
   value: string;
+  locked?: boolean;
+  onUnlock?: () => void;
   accent?: boolean;
 }) {
   return (
     <div
-      className={`cf-panel border-t-4 px-4 py-4 ${
-        accent ? "border-t-stamp" : "border-t-manila"
+      className={`border-2 border-ink p-3.5 min-[900px]:p-4 ${
+        locked ? "bg-manila/25" : "bg-paper"
       }`}
     >
       <p className="cf-label">{label}</p>
-      <p
-        className={`mt-2 font-mono text-2xl tracking-tight ${
-          accent ? "text-stamp" : "text-ink"
-        }`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function CardTable({
-  cards,
-  sort,
-  order,
-  onSort,
-}: {
-  cards: CardListItem[];
-  sort: string;
-  order: "asc" | "desc";
-  onSort: (column: string) => void;
-}) {
-  const cols = [
-    { key: "player", label: "Name" },
-    { key: "setName", label: "Set" },
-    { key: "year", label: "Year" },
-    { key: "grade", label: "Grade" },
-    { key: "value", label: "Value" },
-  ] as const;
-
-  return (
-    <>
-      {/* Mobile-friendly stacked list */}
-      <div className="cf-panel divide-y divide-ink/15 md:hidden">
-        {cards.map((card) => (
-          <Link
-            key={card.id}
-            href={`/app/cards/${card.id}`}
-            className="flex items-center gap-3 px-3 py-3 no-underline active:bg-cream"
-          >
-            <Thumb url={card.thumbnailUrl} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-display text-base text-ink">
-                {card.player}
-              </p>
-              <p className="truncate font-body text-xs text-charcoal">
-                {card.year}
-                {card.brand ? ` · ${card.brand}` : ""} · {card.setName}
-                {card.cardNumber ? ` #${card.cardNumber}` : ""}
-              </p>
-              <p className="mt-0.5 font-mono text-[0.65rem] uppercase tracking-wider text-sage">
-                {categoryShortCode(card.sport)}
-                {card.grade != null ? ` · GR ${card.grade.toFixed(1)}` : ""}
-              </p>
-            </div>
-            <span className="shrink-0 font-mono text-sm font-medium text-stamp">
-              {card.estimatedValue != null
-                ? formatCurrency(card.estimatedValue)
-                : "—"}
-            </span>
-          </Link>
-        ))}
-      </div>
-
-      {/* Desktop table */}
-      <div className="cf-panel hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[640px] text-left font-body text-sm">
-          <thead className="border-b-2 border-ink bg-cream/80">
-            <tr>
-              <th className="px-4 py-3">
-                <span className="cf-label">Card</span>
-              </th>
-              {cols.map((col) => (
-                <th key={col.key} className="px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => onSort(col.key)}
-                    className="cf-label inline-flex items-center gap-1 hover:text-ink"
-                  >
-                    {col.label}
-                    {sort === col.key && (
-                      <span className="font-mono normal-case tracking-normal">
-                        {order === "asc" ? "↑" : "↓"}
-                      </span>
-                    )}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {cards.map((card) => (
-              <tr
-                key={card.id}
-                className="border-b border-ink/15 last:border-0 hover:bg-cream/60"
-              >
-                <td className="px-4 py-3">
-                  <Link
-                    href={`/app/cards/${card.id}`}
-                    className="flex items-center gap-3 no-underline"
-                  >
-                    <Thumb url={card.thumbnailUrl} />
-                    <span className="flex flex-col">
-                      <span className="font-display text-base text-ink">
-                        {card.player}
-                      </span>
-                      <span className="font-mono text-[0.65rem] uppercase tracking-wider text-sage">
-                        {categoryShortCode(card.sport)}
-                      </span>
-                    </span>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-charcoal">
-                  {card.brand ? `${card.brand} · ` : ""}
-                  {card.setName}
-                  {card.cardNumber ? ` #${card.cardNumber}` : ""}
-                </td>
-                <td className="px-4 py-3 font-mono text-charcoal">{card.year}</td>
-                <td className="px-4 py-3 font-mono text-charcoal">
-                  {card.grade != null ? card.grade.toFixed(1) : "—"}
-                </td>
-                <td className="px-4 py-3 font-mono font-medium text-stamp">
-                  {card.estimatedValue != null
-                    ? formatCurrency(card.estimatedValue)
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-function CardGrid({ cards }: { cards: CardListItem[] }) {
-  return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
-      {cards.map((card) => (
-        <Link
-          key={card.id}
-          href={`/app/cards/${card.id}`}
-          className="cf-panel relative p-3 no-underline shadow-[4px_4px_0_rgba(34,40,58,0.08)] sm:p-4"
+      {locked ? (
+        <button
+          type="button"
+          onClick={onUnlock}
+          className="mt-2 inline-flex items-center gap-1.5 font-mono text-xs tracking-wide text-sage uppercase"
         >
-          <span className="absolute -top-2 right-3 border border-ink bg-manila px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-wider text-ink">
-            {categoryShortCode(card.sport)}
-          </span>
-          <div className="mb-3 mx-auto aspect-[2.5/3.5] max-w-[200px] overflow-hidden border border-dashed border-manila bg-cream sm:mx-0 sm:max-w-none">
-            {card.thumbnailUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={card.thumbnailUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center font-mono text-xs tracking-wider text-sage">
-                NO PHOTO
-              </div>
-            )}
-          </div>
-          <h3 className="font-display text-lg text-ink">{card.player}</h3>
-          <p className="mt-1 font-body text-sm text-charcoal">
-            {card.year}
-            {card.brand ? ` · ${card.brand}` : ""} · {card.setName}
-          </p>
-          <div className="mt-3 flex items-center justify-between border-t border-dotted border-manila pt-3 text-sm">
-            <span className="font-mono text-sage">
-              {card.grade != null ? `GR ${card.grade.toFixed(1)}` : "UNGR"}
-            </span>
-            <span className="font-mono font-medium text-stamp">
-              {card.estimatedValue != null
-                ? formatCurrency(card.estimatedValue)
-                : "—"}
-            </span>
-          </div>
-        </Link>
-      ))}
+          <LockIcon /> Pro
+        </button>
+      ) : (
+        <p
+          className={`mt-2 font-mono text-xl font-medium tabular-nums ${
+            accent ? "text-stamp" : "text-ink"
+          }`}
+        >
+          {value}
+        </p>
+      )}
     </div>
   );
 }
 
-function Thumb({ url }: { url: string | null }) {
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="h-10 w-8 shrink-0 overflow-hidden border border-ink/30 bg-cream">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border-2 border-ink px-2.5 py-1 font-mono text-[0.65rem] tracking-wide uppercase transition-colors ${
+        active ? "bg-ink text-paper" : "bg-paper text-charcoal hover:bg-cream"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ConditionPill({ grade }: { grade: number | null }) {
+  if (grade == null) {
+    return (
+      <span className="inline-flex border border-ink/25 bg-cream px-2 py-0.5 font-mono text-[0.65rem] text-sage uppercase">
+        Raw
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex border border-ink bg-cream px-2 py-0.5 font-mono text-[0.65rem] text-ink">
+      {gradeLabel(grade)}{" "}
+      <span className="ml-0.5 tabular-nums text-stamp">{grade.toFixed(1)}</span>
+    </span>
+  );
+}
+
+function Thumb({ url, large }: { url: string | null; large?: boolean }) {
+  return (
+    <div
+      className={`shrink-0 overflow-hidden border border-ink/40 bg-cream ${
+        large ? "h-14 w-10" : "h-11 w-8"
+      }`}
+    >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={url} alt="" className="h-full w-full object-cover" />
       ) : null}
     </div>
+  );
+}
+
+function TrendPlaceholder() {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <svg width="40" height="16" viewBox="0 0 40 16" aria-hidden className="text-sage">
+        <path
+          d="M1 12 L10 8 L18 10 L28 4 L39 6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="font-mono text-xs tabular-nums text-sage">—</span>
+    </span>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="5" y="11" width="14" height="10" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M8 11V8a4 4 0 018 0v3"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }

@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Inter, Special_Elite } from "next/font/google";
 import "./globals.css";
@@ -52,7 +53,9 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${specialElite.variable} ${ibmPlexSans.variable} ${ibmPlexMono.variable}`}
     >
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <ClerkProvider>{children}</ClerkProvider>
+      </body>
     </html>
   );
 }

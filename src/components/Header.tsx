@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeaderAuth } from "@/components/HeaderAuth";
 
 export function Header() {
   return (
@@ -29,18 +30,18 @@ export function Header() {
           Features
         </a>
         <a
+          href="#pricing"
+          className="hidden font-body text-sm text-charcoal no-underline hover:text-ink md:inline"
+        >
+          Pricing
+        </a>
+        <a
           href="#faq"
           className="hidden font-body text-sm text-charcoal no-underline hover:text-ink md:inline"
         >
           FAQ
         </a>
-        <Link
-          href="/app"
-          className="min-h-11 border-2 border-ink bg-ink px-3 py-2 font-body text-sm font-medium text-paper no-underline transition-opacity hover:opacity-90 sm:px-3.5"
-        >
-          <span className="sm:hidden">Start</span>
-          <span className="hidden sm:inline">Get Started</span>
-        </Link>
+        <HeaderAuth />
       </nav>
     </header>
   );

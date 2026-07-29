@@ -1,20 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDemoUserId } from "@/lib/demo-user";
+import { UnauthorizedError, getAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { updateCardSchema } from "@/lib/validators";
 
 type Params = { params: Promise<{ id: string }> };
 
 async function getOwnedCard(id: string) {
-  const userId = await getDemoUserId();
+  const user = await getAppUser();
   return prisma.card.findFirst({
-    where: { id, userId },
+    where: { id, userId: user.id },
     include: {
       images: { orderBy: { createdAt: "asc" } },
       conditions: { orderBy: { createdAt: "desc" } },
       prices: { orderBy: { createdAt: "desc" } },
     },
   });
+}
+
+function authError(error: unknown) {
+  if (error instanceof UnauthorizedError) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
 }
 
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -26,6 +33,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
     }
     return NextResponse.json({ card });
   } catch (error) {
+    const unauthorized = authError(error);
+    if (unauthorized) return unauthorized;
     console.error(error);
     return NextResponse.json({ error: "Failed to load card" }, { status: 500 });
   }
@@ -73,6 +82,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ card });
   } catch (error) {
+    const unauthorized = authError(error);
+    if (unauthorized) return unauthorized;
     console.error(error);
     return NextResponse.json(
       { error: "Failed to update card" },
@@ -91,6 +102,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     await prisma.card.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    const unauthorized = authError(error);
+    if (unauthorized) return unauthorized;
     console.error(error);
     return NextResponse.json(
       { error: "Failed to delete card" },

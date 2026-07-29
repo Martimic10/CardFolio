@@ -9,12 +9,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  cards     Card[]
+  id                   String   @id @default(cuid())
+  clerkUserId          String?  @unique
+  email                String   @unique
+  name                 String?
+  plan                 String   @default("free")
+  stripeCustomerId     String?  @unique
+  stripeSubscriptionId String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  cards                Card[]
 }
 
 model Card {

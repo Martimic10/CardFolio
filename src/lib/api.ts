@@ -1,11 +1,45 @@
 import type { CardListItem } from "@/lib/validators";
 
+export class ApiError extends Error {
+  code?: string;
+  status: number;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Request failed (${res.status})`);
+    const message =
+      typeof body.error === "string"
+        ? body.error
+        : `Request failed (${res.status})`;
+    throw new ApiError(message, res.status, body.code);
   }
   return res.json() as Promise<T>;
+}
+
+export type MeResponse = {
+  id: string;
+  email: string;
+  name: string | null;
+  plan: string;
+  planLabel: string;
+  hasProAccess: boolean;
+  uniqueCards: number;
+  cardLimit: number | null;
+  cardsRemaining: number | null;
+  billingMock: boolean;
+  stripeCustomerId: string | null;
+};
+
+export async function fetchMe() {
+  return parseJson<MeResponse>(await fetch("/api/me"));
 }
 
 export async function fetchCards(params: URLSearchParams) {

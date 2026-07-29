@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { UnauthorizedError, getAppUser } from "@/lib/auth";
 import { calculateGrade } from "@/lib/condition";
-import { getDemoUserId } from "@/lib/demo-user";
-import { estimatePrice } from "@/lib/pricing";
+import { FREE_CARD_LIMIT, hasProAccess } from "@/lib/plans";
+import { getPriceEstimate } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import { createCardSchema } from "@/lib/validators";
 
@@ -39,9 +40,17 @@ function mapCard(card: {
   };
 }
 
+function authError(error: unknown) {
+  if (error instanceof UnauthorizedError) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const userId = await getDemoUserId();
+    const user = await getAppUser();
+    const userId = user.id;
     const { searchParams } = request.nextUrl;
     const q = searchParams.get("q")?.trim() ?? "";
     const sport = searchParams.get("sport") ?? "";
@@ -115,6 +124,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ cards: mapped });
   } catch (error) {
+    const unauthorized = authError(error);
+    if (unauthorized) return unauthorized;
     console.error(error);
     return NextResponse.json(
       { error: "Failed to load cards" },
@@ -125,7 +136,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getDemoUserId();
+    const user = await getAppUser();
+    const userId = user.id;
+    const pro = hasProAccess(user);
+
+    if (!pro) {
+      const count = await prisma.card.count({ where: { userId } });
+      if (count >= FREE_CARD_LIMIT) {
+        return NextResponse.json(
+          {
+            error: `Free plan is limited to ${FREE_CARD_LIMIT} cards. Upgrade to Pro for unlimited cataloging.`,
+            code: "CARD_LIMIT",
+            limit: FREE_CARD_LIMIT,
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     const body = await request.json();
     const parsed = createCardSchema.safeParse(body);
     if (!parsed.success) {
@@ -136,15 +164,16 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
-    const grade = data.condition
-      ? calculateGrade(data.condition)
-      : null;
-    const price = estimatePrice({
-      year: data.year,
-      sport: data.sport,
-      grade,
-      startingPrice: data.startingPrice,
-    });
+    const grade = data.condition ? calculateGrade(data.condition) : null;
+    const priceResult = getPriceEstimate(
+      {
+        year: data.year,
+        sport: data.sport,
+        grade,
+        startingPrice: data.startingPrice,
+      },
+      { hasProAccess: pro },
+    );
 
     const card = await prisma.card.create({
       data: {
@@ -174,12 +203,14 @@ export async function POST(request: NextRequest) {
               },
             }
           : undefined,
-        prices: {
-          create: {
-            amount: price,
-            source: data.startingPrice ? "manual" : "estimate",
-          },
-        },
+        prices: priceResult
+          ? {
+              create: {
+                amount: priceResult.amount,
+                source: priceResult.source,
+              },
+            }
+          : undefined,
       },
       include: {
         images: true,
@@ -190,6 +221,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ card: mapCard(card) }, { status: 201 });
   } catch (error) {
+    const unauthorized = authError(error);
+    if (unauthorized) return unauthorized;
     console.error(error);
     return NextResponse.json(
       { error: "Failed to create card" },

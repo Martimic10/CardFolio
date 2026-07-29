@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { UnauthorizedError, getAppUser } from "@/lib/auth";
 import { calculateGrade } from "@/lib/condition";
-import { getDemoUserId } from "@/lib/demo-user";
 import { prisma } from "@/lib/prisma";
 import { conditionSchema } from "@/lib/validators";
 
@@ -9,8 +9,10 @@ type Params = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const userId = await getDemoUserId();
-    const card = await prisma.card.findFirst({ where: { id, userId } });
+    const user = await getAppUser();
+    const card = await prisma.card.findFirst({
+      where: { id, userId: user.id },
+    });
     if (!card) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -39,6 +41,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ condition }, { status: 201 });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error(error);
     return NextResponse.json(
       { error: "Failed to save condition" },

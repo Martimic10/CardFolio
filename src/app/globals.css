@@ -18,6 +18,15 @@
   --color-app-text: #171717;
   --color-app-accent: #1a5f4a;
 
+  /* Dashboard shell */
+  --color-dash-bg: #f7f7f5;
+  --color-dash-surface: #ffffff;
+  --color-dash-border: #e5e5e2;
+  --color-dash-muted: #6b6b66;
+  --color-dash-text: #171717;
+  --color-dash-accent: #2451b8;
+  --color-dash-locked: #f0f0ee;
+
   --font-display: var(--font-special-elite), "Courier New", Courier, monospace;
   --font-body: var(--font-ibm-plex-sans), "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-ibm-plex-mono), "Courier New", Courier, monospace;
@@ -136,4 +145,20 @@ body {
   .app-main {
     padding-bottom: 3rem;
   }
+}
+
+/* Dashboard shell */
+.dash-main {
+  padding: 1.25rem 1rem 6.5rem;
+}
+
+@media (min-width: 900px) {
+  .dash-main {
+    padding: 2rem 2rem 3rem;
+  }
+}
+
+.dash-num {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono), ui-monospace, monospace;
 }

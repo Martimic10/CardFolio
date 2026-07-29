@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDemoUserId } from "@/lib/demo-user";
+import { UnauthorizedError, getAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const userId = await getDemoUserId();
+    const user = await getAppUser();
     const cards = await prisma.card.findMany({
-      where: { userId },
+      where: { userId: user.id },
       include: {
         prices: { orderBy: { createdAt: "desc" }, take: 1 },
       },
@@ -24,6 +24,9 @@ export async function GET() {
       uniqueCards: cards.length,
     });
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error(error);
     return NextResponse.json(
       { error: "Failed to load summary" },

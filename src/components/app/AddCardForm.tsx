@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ApiError,
   createCard,
+  fetchMe,
   fetchScanStatus,
   scanCardImage,
   uploadFiles,
@@ -13,6 +15,7 @@ import {
 } from "@/lib/api";
 import { CARD_CATEGORIES } from "@/lib/categories";
 import { calculateGrade } from "@/lib/condition";
+import { UpgradePopup } from "@/components/app/UpgradePopup";
 
 type Mode = "single" | "bulk";
 
@@ -67,6 +70,19 @@ export function AddCardForm() {
   const [dragOver, setDragOver] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
   const [scanNote, setScanNote] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState(
+    "Free plan includes 50 cards. Upgrade for unlimited cataloging.",
+  );
+
+  const meQuery = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+  });
+  const atCardLimit =
+    meQuery.data != null &&
+    !meQuery.data.hasProAccess &&
+    (meQuery.data.cardsRemaining ?? 0) <= 0;
 
   const scanStatus = useQuery({
     queryKey: ["scan-status"],
@@ -125,6 +141,7 @@ export function AddCardForm() {
     onSuccess: async ({ result, stayOpen }) => {
       await queryClient.invalidateQueries({ queryKey: ["cards"] });
       await queryClient.invalidateQueries({ queryKey: ["summary"] });
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
       if (stayOpen) {
         setForm(emptyForm);
         setFiles([]);
@@ -133,7 +150,13 @@ export function AddCardForm() {
         router.push(`/app/cards/${result.card.id}`);
       }
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) => {
+      if (err instanceof ApiError && err.code === "CARD_LIMIT") {
+        setUpgradeReason(err.message);
+        setUpgradeOpen(true);
+      }
+      setError(err.message);
+    },
   });
 
   const scanFirstPhotoMutation = useMutation({
@@ -237,12 +260,17 @@ export function AddCardForm() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cards"] });
       await queryClient.invalidateQueries({ queryKey: ["summary"] });
+      await queryClient.invalidateQueries({ queryKey: ["me"] });
       setBulkProgress(null);
       setFiles([]);
       router.push("/app/collection");
     },
     onError: (err: Error) => {
       setBulkProgress(null);
+      if (err instanceof ApiError && err.code === "CARD_LIMIT") {
+        setUpgradeReason(err.message);
+        setUpgradeOpen(true);
+      }
       setError(err.message);
     },
   });
@@ -277,6 +305,24 @@ export function AddCardForm() {
         </Link>
         <p className="cf-label mt-4 mb-2">New record</p>
         <h1 className="font-display text-2xl text-ink sm:text-3xl">Add cards</h1>
+        {meQuery.data && !meQuery.data.hasProAccess && (
+          <p className="mt-2 font-body text-sm text-charcoal">
+            Free plan: {meQuery.data.uniqueCards}/{meQuery.data.cardLimit} cards
+            used.
+            {atCardLimit && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => setUpgradeOpen(true)}
+                >
+                  Upgrade to Pro
+                </button>
+              </>
+            )}
+          </p>
+        )}
         <p className="mt-2 font-body text-sm text-charcoal">
           Add one card with full details, or bulk-import a stack. When scanning
           is on, each photo is auto-read for name, category, year, set, and
@@ -323,6 +369,10 @@ export function AddCardForm() {
         className="space-y-4 sm:space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
+          if (atCardLimit) {
+            setUpgradeOpen(true);
+            return;
+          }
           if (mode === "bulk") {
             bulkMutation.mutate();
           } else {
@@ -637,15 +687,21 @@ export function AddCardForm() {
             <>
               <button
                 type="submit"
-                disabled={pending}
+                disabled={pending || atCardLimit}
                 className="cf-btn cf-btn-primary w-full sm:w-auto"
               >
                 {pending && singleMutation.isPending ? "Saving…" : "Save card"}
               </button>
               <button
                 type="button"
-                disabled={pending}
-                onClick={() => singleMutation.mutate(true)}
+                disabled={pending || atCardLimit}
+                onClick={() => {
+                  if (atCardLimit) {
+                    setUpgradeOpen(true);
+                    return;
+                  }
+                  singleMutation.mutate(true);
+                }}
                 className="cf-btn w-full sm:w-auto"
               >
                 Save & add another
@@ -654,7 +710,7 @@ export function AddCardForm() {
           ) : (
             <button
               type="submit"
-              disabled={pending || files.length === 0}
+              disabled={pending || files.length === 0 || atCardLimit}
               className="cf-btn cf-btn-primary w-full sm:w-auto"
             >
               {pending
@@ -662,8 +718,23 @@ export function AddCardForm() {
                 : `Import ${files.length || ""} card${files.length === 1 ? "" : "s"}`}
             </button>
           )}
+          {atCardLimit && (
+            <button
+              type="button"
+              className="cf-btn cf-btn-primary w-full sm:w-auto"
+              onClick={() => setUpgradeOpen(true)}
+            >
+              Upgrade for unlimited cards
+            </button>
+          )}
         </div>
       </form>
+
+      <UpgradePopup
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        reason={upgradeReason}
+      />
     </div>
   );
 }

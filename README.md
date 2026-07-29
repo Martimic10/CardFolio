@@ -27,11 +27,57 @@ npm run dev
 
 | Table        | Purpose                                      |
 |--------------|----------------------------------------------|
-| `User`       | App owner (single-user until auth)           |
+| `User`       | Clerk-linked account, plan, Stripe ids       |
 | `Card`       | Catalog entries                              |
 | `CardImage`  | Uploaded photo paths under `/public/uploads` |
 | `Condition`  | Grade estimate history                         |
 | `PriceEntry` | Price history                                |
+
+## Auth (Clerk)
+
+1. Create an app at [dashboard.clerk.com](https://dashboard.clerk.com)
+2. Add to `.env` / Vercel:
+
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+```
+
+`/app` and card APIs require a signed-in user. First sign-in upserts a `User` row by `clerkUserId`.
+
+## Billing (Stripe test mode)
+
+1. Add keys to `.env` from [Stripe test API keys](https://dashboard.stripe.com/test/apikeys):
+
+```env
+BILLING_MOCK="false"
+STRIPE_SECRET_KEY="sk_test_..."
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+2. Create Pro price IDs (or run with your secret key loaded):
+
+```bash
+npm run stripe:setup
+```
+
+Paste the printed `STRIPE_PRICE_PRO_MONTHLY` and `STRIPE_PRICE_PRO_LIFETIME` into `.env`.
+
+3. Forward webhooks locally:
+
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+Copy the `whsec_…` signing secret into `STRIPE_WEBHOOK_SECRET`.
+
+4. Restart `npm run dev`, open Settings → Upgrade, and pay with test card `4242 4242 4242 4242`.
+
+Webhook endpoint (production): `/api/webhooks/stripe`
+
+With `BILLING_MOCK=true` (or no secret key), upgrades still apply instantly without Stripe.
 
 ```bash
 npm run db:seed       # ensure user + empty catalog

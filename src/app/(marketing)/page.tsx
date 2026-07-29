@@ -5,6 +5,7 @@ import { FooterCta } from "@/components/FooterCta";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { HowItWorks } from "@/components/HowItWorks";
+import { Pricing } from "@/components/Pricing";
 
 export default function HomePage() {
   return (
@@ -13,6 +14,7 @@ export default function HomePage() {
       <Hero />
       <HowItWorks />
       <Features />
+      <Pricing />
       <Faq />
       <FooterCta />
       <Footer />
