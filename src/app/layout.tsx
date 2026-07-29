@@ -34,6 +34,10 @@ export const metadata: Metadata = {
   title: "Cardfolio",
   description:
     "Upload a photo, get the player, set, condition, and current market value back automatically.",
+  icons: {
+    icon: [{ url: "/cardfolio-mark.png", type: "image/png" }],
+    apple: [{ url: "/cardfolio-mark.png", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

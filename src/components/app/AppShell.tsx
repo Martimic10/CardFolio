@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { fetchMe } from "@/lib/api";
+import { BrandMark } from "@/components/BrandMark";
 import { UpgradePopup } from "@/components/app/UpgradePopup";
+import { fetchMe } from "@/lib/api";
 
 const nav = [
   { href: "/app/collection", label: "Dashboard", icon: "grid" as const },
@@ -83,9 +84,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[220px] flex-col border-r-2 border-ink bg-paper/95 min-[900px]:flex">
         <div className="flex items-center gap-2.5 border-b-2 border-ink px-4 py-4">
           <Link href="/" className="group flex items-center gap-2.5 no-underline">
-            <span className="inline-flex h-9 w-9 shrink-0 -rotate-6 items-center justify-center border-2 border-ink bg-cream font-display text-sm tracking-wide text-ink shadow-[3px_3px_0_rgba(34,40,58,0.18)] transition-transform group-hover:rotate-[-3deg]">
-              CF
-            </span>
+            <BrandMark
+              size={36}
+              priority
+              className="-rotate-6 border-2 border-ink shadow-[3px_3px_0_rgba(34,40,58,0.18)] transition-transform group-hover:rotate-[-3deg]"
+            />
             <span className="flex flex-col">
               <span className="font-display text-lg tracking-wide text-ink">
                 Cardfolio
@@ -153,9 +156,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile top bar */}
       <header className="sticky top-0 z-30 flex items-center justify-between border-b-2 border-ink bg-paper/95 px-4 py-3 backdrop-blur-md min-[900px]:hidden">
         <Link href="/" className="flex items-center gap-2 no-underline">
-          <span className="inline-flex h-8 w-8 -rotate-6 items-center justify-center border-2 border-ink bg-cream font-display text-xs text-ink">
-            CF
-          </span>
+          <BrandMark
+            size={32}
+            className="-rotate-6 border-2 border-ink"
+          />
           <span className="font-display text-base tracking-wide text-ink">
             Cardfolio
           </span>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/BrandMark";
 
 const links = [
   { href: "/#how-it-works", label: "How it works" },
@@ -14,12 +15,10 @@ export function Footer() {
         <div className="flex flex-col gap-8 px-5 py-7 sm:px-6 sm:py-8 md:flex-row md:items-start md:justify-between md:px-8 md:py-10">
           <div className="max-w-sm">
             <Link href="/" className="mb-4 inline-flex items-center gap-3 no-underline">
-              <span
-                aria-hidden
-                className="inline-flex h-8 w-8 -rotate-6 items-center justify-center border-2 border-ink bg-cream font-display text-xs tracking-wide text-ink shadow-[2px_2px_0_rgba(34,40,58,0.15)]"
-              >
-                CF
-              </span>
+              <BrandMark
+                size={32}
+                className="-rotate-6 border-2 border-ink shadow-[2px_2px_0_rgba(34,40,58,0.15)]"
+              />
               <span className="font-display text-xl tracking-wide text-ink">
                 Cardfolio
               </span>
